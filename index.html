@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TP IoT — Dashboard</title>
+<style>
+  :root {
+    --bg: #0d1419;
+    --panel: #141d25;
+    --panel-2: #1a2530;
+    --line: #26343f;
+    --text: #e6edf2;
+    --muted: #8397a6;
+    --temp: #f5a54a;
+    --hum: #4cc9e0;
+    --ai: #b79cff;
+    --on: #3ddc97;
+    --off: #5b6b78;
+    --danger: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    font-variant-numeric: tabular-nums; line-height: 1.4;
+  }
+  .page { max-width: 1240px; margin: 0 auto; padding: 20px 18px 48px; }
+
+  /* Barre du haut */
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .topbar h1 { margin: 0; font-size: 1.35rem; font-weight: 650; }
+  .topbar p { margin: 2px 0 0; color: var(--muted); font-size: .85rem; }
+  .conn { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; font-size: .85rem; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--off); }
+  .dot.live { background: var(--on); box-shadow: 0 0 0 4px rgba(61,220,151,.15); }
+  .dot.err { background: var(--danger); }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .panel h2 { margin: 0 0 14px; font-size: .95rem; font-weight: 600; color: var(--muted); }
+
+  /* KPI */
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+  .kpi { border-left: 4px solid var(--c); }
+  .kpi .label { color: var(--muted); font-size: .85rem; }
+  .kpi .value { font-size: clamp(2rem, 4vw, 2.9rem); font-weight: 700; margin: 6px 0 4px; letter-spacing: -.02em; }
+  .kpi .value small { font-size: .45em; font-weight: 500; color: var(--muted); margin-left: 4px; }
+  .kpi .delta { font-size: .82rem; color: var(--muted); }
+  .kpi .delta b.up { color: var(--temp); } .kpi .delta b.down { color: var(--hum); }
+  .ai-row { display: flex; gap: 22px; }
+
+  /* Grille principale */
+  .main { display: grid; grid-template-columns: 1fr 300px; gap: 16px; margin-bottom: 16px; }
+  .charts { display: grid; gap: 18px; }
+  .chart-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .chart-head h2 { margin: 0; }
+  .legend { font-size: .78rem; color: var(--muted); display: flex; gap: 14px; }
+  .legend i { display: inline-block; width: 14px; height: 0; border-top: 2px solid; margin-right: 5px; vertical-align: middle; }
+  .legend i.dash { border-top-style: dashed; }
+  .chart { position: relative; height: 190px; }
+  canvas { width: 100%; height: 100%; display: block; }
+  .tip { position: absolute; pointer-events: none; background: #0a1015; border: 1px solid var(--line); padding: 5px 9px; border-radius: 6px; font-size: .78rem; white-space: nowrap; opacity: 0; transform: translate(-50%, -120%); }
+
+  /* LED */
+  .leds { display: grid; gap: 12px; align-content: start; }
+  .led { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; }
+  .led .name { font-weight: 600; }
+  .led .state { font-size: .8rem; color: var(--muted); }
+  .led.on .state { color: var(--on); }
+  .switch { position: relative; width: 52px; height: 28px; border: none; border-radius: 999px; background: var(--off); cursor: pointer; padding: 0; transition: background .2s; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .led.on .switch { background: var(--on); }
+  .led.on .switch::after { transform: translateX(24px); }
+  .switch:focus-visible, .seg button:focus-visible { outline: 2px solid var(--hum); outline-offset: 3px; }
+
+  /* Stats + tableau */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .stat { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .stat span { display: block; font-size: .78rem; color: var(--muted); }
+  .stat b { font-size: 1.05rem; }
+  .stat b em { font-style: normal; color: var(--temp); } .stat b em.h { color: var(--hum); }
+  .table-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+  .table-head h2 { margin: 0; }
+  .seg { display: flex; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { background: none; border: none; color: var(--muted); padding: 6px 12px; font-size: .8rem; cursor: pointer; }
+  .seg button.active { background: var(--line); color: var(--text); }
+  .table-wrap { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th, td { padding: 9px 14px; text-align: left; border-bottom: 1px solid var(--line); }
+  th { position: sticky; top: 0; background: var(--panel-2); color: var(--muted); font-weight: 600; font-size: .8rem; }
+  td.temp { color: var(--temp); } td.hum { color: var(--hum); }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,.03); }
+  .empty { padding: 28px; text-align: center; color: var(--muted); }
+
+  @media (max-width: 900px) {
+    .kpis { grid-template-columns: 1fr; }
+    .main { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="topbar">
+    <div>
+      <h1>TP IoT — Dashboard</h1>
+      <p>ESP32 · DHT22 · Firebase · Prédiction IA</p>
+    </div>
+    <div class="conn"><span class="dot" id="connDot"></span><span id="connText">Connexion…</span></div>
+  </div>
+
+  <!-- Mesures actuelles -->
+  <div class="kpis">
+    <div class="panel kpi" style="--c:var(--temp)">
+      <div class="label">Température</div>
+      <div class="value"><span id="tempValue">--</span><small>°C</small></div>
+      <div class="delta" id="tempDelta">En attente de mesure</div>
+    </div>
+    <div class="panel kpi" style="--c:var(--hum)">
+      <div class="label">Humidité</div>
+      <div class="value"><span id="humValue">--</span><small>%</small></div>
+      <div class="delta" id="humDelta">En attente de mesure</div>
+    </div>
+    <div class="panel kpi" style="--c:var(--ai)">
+      <div class="label">Prochaine mesure estimée par l'IA</div>
+      <div class="ai-row">
+        <div class="value"><span id="aiTempValue">--</span><small>°C</small></div>
+        <div class="value"><span id="aiHumValue">--</span><small>%</small></div>
+      </div>
+      <div class="delta">Calculée par le script Python</div>
+    </div>
+  </div>
+
+  <!-- Graphiques + LED -->
+  <div class="main">
+    <div class="panel charts">
+      <div>
+        <div class="chart-head">
+          <h2>Température</h2>
+          <div class="legend"><span><i style="color:var(--temp)"></i>Mesure</span><span><i class="dash" style="color:var(--ai)"></i>Prédiction IA</span></div>
+        </div>
+        <div class="chart"><canvas id="chartTemp"></canvas><div class="tip" id="tipTemp"></div></div>
+      </div>
+      <div>
+        <div class="chart-head">
+          <h2>Humidité</h2>
+          <div class="legend"><span><i style="color:var(--hum)"></i>Mesure</span><span><i class="dash" style="color:var(--ai)"></i>Prédiction IA</span></div>
+        </div>
+        <div class="chart"><canvas id="chartHum"></canvas><div class="tip" id="tipHum"></div></div>
+      </div>
+    </div>
+
+    <div class="panel leds">
+      <h2>Commandes</h2>
+      <div class="led" id="led1">
+        <div><div class="name">LED 1</div><div class="state" id="ledState1">Éteinte</div></div>
+        <button class="switch" id="sw1" aria-label="Basculer la LED 1"></button>
+      </div>
+      <div class="led" id="led2">
+        <div><div class="name">LED 2</div><div class="state" id="ledState2">Éteinte</div></div>
+        <button class="switch" id="sw2" aria-label="Basculer la LED 2"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historique -->
+  <div class="panel">
+    <div class="table-head">
+      <h2>Historique des mesures</h2>
+      <div class="seg" id="range">
+        <button data-n="20">20 dernières</button>
+        <button data-n="50" class="active">50 dernières</button>
+        <button data-n="200">200 dernières</button>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span>Température min / max</span><b id="stT"><em>--</em></b></div>
+      <div class="stat"><span>Température moyenne</span><b id="stTa"><em>--</em></b></div>
+      <div class="stat"><span>Humidité min / max</span><b id="stH"><em class="h">--</em></b></div>
+      <div class="stat"><span>Humidité moyenne</span><b id="stHa"><em class="h">--</em></b></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date et heure</th><th>Température</th><th>Humidité</th></tr></thead>
+        <tbody id="histBody"><tr><td colspan="3" class="empty">Aucune mesure pour le moment.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+  import { getDatabase, ref, onValue, set, query, limitToLast } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBOKDMWWuCalx1uIr878NNY3ZIO4HgvAxI",
+    authDomain: "oct-stage.firebaseapp.com",
+    databaseURL: "https://oct-stage-default-rtdb.firebaseio.com",
+    projectId: "oct-stage",
+    storageBucket: "oct-stage.firebasestorage.app",
+    messagingSenderId: "1073681258417",
+    appId: "1:1073681258417:web:c27f894a3e0783897b8f90",
+    measurementId: "G-4XEBDGEE3Q"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const $ = id => document.getElementById(id);
+
+  /* ---------- État ---------- */
+  let history = [];      // [{t, temp, hum}] depuis /history
+  let live = [];         // mesures reçues en direct (secours si /history est vide)
+  let prediction = null; // {temperature, humidity}
+  let limit = 50;
+
+  /* ---------- Connexion ---------- */
+  onValue(ref(db, ".info/connected"), s => {
+    $("connDot").className = "dot " + (s.val() ? "live" : "err");
+    $("connText").textContent = s.val() ? "Connecté à Firebase" : "Hors ligne";
+  });
+
+  /* ---------- LED ---------- */
+  function bindLed(path, n) {
+    const r = ref(db, path);
+    let current = false;
+    onValue(r, s => {
+      current = !!s.val();
+      $("led" + n).classList.toggle("on", current);
+      $("ledState" + n).textContent = current ? "Allumée" : "Éteinte";
+    });
+    $("sw" + n).onclick = () => set(r, !current);
+  }
+  bindLed("/led_1", 1);
+  bindLed("/led_2", 2);
+
+  /* ---------- Capteurs en direct ---------- */
+  let prev = null;
+  function delta(el, now, before, unit) {
+    if (before == null) { el.textContent = "Première mesure reçue"; return; }
+    const d = now - before;
+    if (Math.abs(d) < 0.05) { el.textContent = "Stable depuis la mesure précédente"; return; }
+    el.innerHTML = `<b class="${d > 0 ? "up" : "down"}">${d > 0 ? "▲" : "▼"} ${Math.abs(d).toFixed(1)} ${unit}</b> depuis la mesure précédente`;
+  }
+  onValue(ref(db, "/sensors"), s => {
+    const d = s.val();
+    if (!d) return;
+    const hasT = typeof d.temperature === "number", hasH = typeof d.humidity === "number";
+    if (hasT) { $("tempValue").textContent = d.temperature.toFixed(1); delta($("tempDelta"), d.temperature, prev?.temperature, "°C"); }
+    if (hasH) { $("humValue").textContent = d.humidity.toFixed(1); delta($("humDelta"), d.humidity, prev?.humidity, "%"); }
+    if (hasT && hasH) {
+      prev = { temperature: d.temperature, humidity: d.humidity };
+      live.push({ t: Date.now(), temp: d.temperature, hum: d.humidity });
+      if (live.length > 300) live.shift();
+      if (!history.length) render();
+    }
+  });
+
+  /* ---------- Prédiction IA ---------- */
+  onValue(ref(db, "/ai/prediction"), s => {
+    const d = s.val();
+    if (!d) return;
+    prediction = d;
+    if (typeof d.temperature === "number") $("aiTempValue").textContent = d.temperature.toFixed(1);
+    if (typeof d.humidity === "number") $("aiHumValue").textContent = d.humidity.toFixed(1);
+    render();
+  });
+
+  /* ---------- Historique ---------- */
+  function parseTs(v) {
+    if (typeof v === "number") return v > 1e11 ? v : (v > 1e9 ? v * 1000 : null);
+    if (typeof v === "string") { const n = Date.parse(v); return isNaN(n) ? null : n; }
+    return null;
+  }
+  function loadHistory(val) {
+    const items = Array.isArray(val) ? val : Object.values(val || {});
+    const rows = items
+      .filter(e => e && typeof e.temperature === "number" && typeof e.humidity === "number")
+      .map(e => ({ t: parseTs(e.timestamp ?? e.ts ?? e.time ?? e.date), temp: e.temperature, hum: e.humidity }));
+    if (rows.length && rows.every(r => r.t)) rows.sort((a, b) => a.t - b.t);
+    return rows;
+  }
+  function watchHistory() {
+    onValue(query(ref(db, "/history"), limitToLast(limit)), s => {
+      history = loadHistory(s.val());
+      render();
+    });
+  }
+  watchHistory();
+
+  $("range").onclick = e => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    limit = +b.dataset.n;
+    document.querySelectorAll("#range button").forEach(x => x.classList.toggle("active", x === b));
+    watchHistory();
+  };
+
+  /* ---------- Rendu ---------- */
+  const fmtDate = t => t ? new Date(t).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
+  const fmtShort = t => t ? new Date(t).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
+
+  function render() {
+    const rows = history.length ? history.slice(-limit) : live.slice(-limit);
+    renderTable(rows);
+    renderStats(rows);
+    drawChart("chartTemp", "tipTemp", rows, "temp", "#f5a54a", "°C", prediction?.temperature);
+    drawChart("chartHum", "tipHum", rows, "hum", "#4cc9e0", "%", prediction?.humidity);
+  }
+
+  function renderTable(rows) {
+    const body = $("histBody");
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="3" class="empty">Aucune mesure pour le moment.</td></tr>'; return; }
+    body.innerHTML = rows.slice().reverse().map((r, i) =>
+      `<tr><td>${r.t ? fmtDate(r.t) : "Mesure n°" + (rows.length - i)}</td><td class="temp">${r.temp.toFixed(1)} °C</td><td class="hum">${r.hum.toFixed(1)} %</td></tr>`
+    ).join("");
+  }
+
+  function renderStats(rows) {
+    if (!rows.length) return;
+    const T = rows.map(r => r.temp), H = rows.map(r => r.hum);
+    const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+    $("stT").innerHTML = `<em>${Math.min(...T).toFixed(1)}</em> / <em>${Math.max(...T).toFixed(1)}</em> °C`;
+    $("stTa").innerHTML = `<em>${avg(T).toFixed(1)}</em> °C`;
+    $("stH").innerHTML = `<em class="h">${Math.min(...H).toFixed(1)}</em> / <em class="h">${Math.max(...H).toFixed(1)}</em> %`;
+    $("stHa").innerHTML = `<em class="h">${avg(H).toFixed(1)}</em> %`;
+  }
+
+  /* ---------- Graphique (canvas, sans bibliothèque) ---------- */
+  const hover = {};
+  function drawChart(canvasId, tipId, rows, key, color, unit, pred) {
+    const cv = $(canvasId), ctx = cv.getContext("2d");
+    const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = "11px 'Segoe UI', sans-serif";
+
+    const vals = rows.map(r => r[key]);
+    if (!vals.length) {
+      ctx.fillStyle = "#8397a6"; ctx.textAlign = "center";
+      ctx.fillText("En attente de données", W / 2, H / 2); return;
+    }
+    const hasPred = typeof pred === "number";
+    const all = hasPred ? vals.concat(pred) : vals;
+    let lo = Math.min(...all), hi = Math.max(...all);
+    const pad = Math.max((hi - lo) * 0.2, 0.5); lo -= pad; hi += pad;
+
+    const L = 40, R = 12, Tp = 8, B = 22;
+    const n = vals.length + (hasPred ? 1 : 0);
+    const x = i => L + (n === 1 ? (W - L - R) / 2 : i * (W - L - R) / (n - 1));
+    const y = v => Tp + (1 - (v - lo) / (hi - lo)) * (H - Tp - B);
+
+    // grille + axe Y
+    ctx.strokeStyle = "#26343f"; ctx.fillStyle = "#8397a6"; ctx.lineWidth = 1; ctx.textAlign = "right";
+    for (let g = 0; g <= 3; g++) {
+      const v = lo + (hi - lo) * g / 3, yy = y(v);
+      ctx.beginPath(); ctx.moveTo(L, yy); ctx.lineTo(W - R, yy); ctx.stroke();
+      ctx.fillText(v.toFixed(1), L - 6, yy + 4);
+    }
+    // axe X (heures)
+    ctx.textAlign = "center";
+    [0, Math.floor((vals.length - 1) / 2), vals.length - 1].forEach((i, k, arr) => {
+      if (arr.indexOf(i) !== k || !rows[i]?.t) return;
+      ctx.fillText(fmtShort(rows[i].t), Math.min(Math.max(x(i), L + 14), W - R - 14), H - 6);
+    });
+
+    // aire
+    const grad = ctx.createLinearGradient(0, Tp, 0, H - B);
+    grad.addColorStop(0, color + "40"); grad.addColorStop(1, color + "00");
+    ctx.beginPath(); ctx.moveTo(x(0), H - B);
+    vals.forEach((v, i) => ctx.lineTo(x(i), y(v)));
+    ctx.lineTo(x(vals.length - 1), H - B); ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+
+    // courbe
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = "round";
+    vals.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));
+    ctx.stroke();
+
+    // prédiction (pointillés)
+    const last = vals.length - 1;
+    if (hasPred) {
+      ctx.beginPath(); ctx.setLineDash([5, 4]); ctx.strokeStyle = "#b79cff"; ctx.lineWidth = 2;
+      ctx.moveTo(x(last), y(vals[last])); ctx.lineTo(x(last + 1), y(pred)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(x(last + 1), y(pred), 4, 0, 7); ctx.fillStyle = "#b79cff"; ctx.fill();
+    }
+    // dernier point
+    ctx.beginPath(); ctx.arc(x(last), y(vals[last]), 4, 0, 7); ctx.fillStyle = color; ctx.fill();
+
+    // survol
+    hover[canvasId] = { x, y, vals, rows, unit, pred: hasPred ? pred : null, n, L, R };
+    if (!cv._bound) {
+      cv._bound = true;
+      cv.addEventListener("mousemove", e => {
+        const h = hover[canvasId]; if (!h) return;
+        const px = e.clientX - cv.getBoundingClientRect().left;
+        let i = Math.round((px - h.L) / ((cv.clientWidth - h.L - h.R) / Math.max(h.n - 1, 1)));
+        i = Math.max(0, Math.min(h.n - 1, i));
+        const isPred = i >= h.vals.length, v = isPred ? h.pred : h.vals[i];
+        const tip = $(tipId);
+        tip.textContent = `${isPred ? "Prédiction" : (h.rows[i].t ? fmtDate(h.rows[i].t) : "Mesure " + (i + 1))} : ${v.toFixed(1)} ${h.unit}`;
+        tip.style.left = Math.min(Math.max(h.x(i), 90), cv.clientWidth - 90) + "px";
+        tip.style.top = h.y(v) + "px"; tip.style.opacity = 1;
+      });
+      cv.addEventListener("mouseleave", () => { $(tipId).style.opacity = 0; });
+    }
+  }
+  window.addEventListener("resize", render);
+  render();
+</script>
+</body>
+</html>
