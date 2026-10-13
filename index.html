@@ -15,6 +15,9 @@
     --temp: #f5a54a;
     --hum: #4cc9e0;
     --ai: #b79cff;
+    --soil: #7bd88f;
+    --ph: #e879c9;
+    --light: #ffd166;
     --on: #3ddc97;
     --off: #5b6b78;
     --danger: #ff6b6b;
@@ -93,7 +96,35 @@
   tbody tr:hover { background: rgba(255,255,255,.03); }
   .empty { padding: 28px; text-align: center; color: var(--muted); }
 
+  /* Irrigation */
+  .irrig { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .need-row { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .need-badge { min-width: 132px; text-align: center; padding: 10px 14px; border-radius: 10px; font-weight: 700; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); }
+  .need-badge[data-need="Low"] { color: var(--on); border-color: var(--on); }
+  .need-badge[data-need="Medium"] { color: var(--temp); border-color: var(--temp); }
+  .need-badge[data-need="High"] { color: var(--danger); border-color: var(--danger); }
+  .need-reason { font-weight: 600; }
+  .sub { color: var(--muted); font-size: .8rem; margin-top: 4px; }
+  .probs { display: grid; gap: 6px; margin-bottom: 16px; }
+  .prob { display: grid; grid-template-columns: 62px 1fr 44px; gap: 8px; align-items: center; font-size: .8rem; color: var(--muted); }
+  .prob .bar { background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+  .prob i { display: block; height: 6px; background: var(--ai); }
+  .prob b { text-align: right; color: var(--text); font-weight: 600; }
+  .valve-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .valve-head .name { font-weight: 600; }
+  .valve-head .state { font-size: .85rem; color: var(--muted); }
+  .valve-head .state.open { color: var(--on); }
+  .led.disabled { opacity: .5; }
+  .led.disabled .switch { pointer-events: none; }
+  .form { display: grid; gap: 14px; margin-bottom: 14px; }
+  .field { display: grid; gap: 6px; font-size: .85rem; color: var(--muted); }
+  .field select, .field input { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; font: inherit; }
+  .field select:focus-visible, .field input:focus-visible { outline: 2px solid var(--hum); outline-offset: 2px; }
+  .field .seg { width: fit-content; }
+  .warn { background: rgba(255,107,107,.08); border: 1px solid var(--danger); color: var(--danger); border-radius: 8px; padding: 10px 12px; font-size: .82rem; margin-bottom: 12px; }
+
   @media (max-width: 900px) {
+    .irrig { grid-template-columns: 1fr; }
     .kpis { grid-template-columns: 1fr; }
     .main { grid-template-columns: 1fr; }
     .stats { grid-template-columns: repeat(2, 1fr); }
@@ -107,7 +138,7 @@
   <div class="topbar">
     <div>
       <h1>TP IoT — Dashboard</h1>
-      <p>ESP32 · DHT22 · Firebase · Prédiction IA</p>
+      <p>ESP32 · capteurs · Firebase · IA · Irrigation</p>
     </div>
     <div class="conn"><span class="dot" id="connDot"></span><span id="connText">Connexion…</span></div>
   </div>
@@ -131,6 +162,25 @@
         <div class="value"><span id="aiHumValue">--</span><small>%</small></div>
       </div>
       <div class="delta">Calculée par le script Python</div>
+    </div>
+  </div>
+
+  <!-- Parcelle -->
+  <div class="kpis">
+    <div class="panel kpi" style="--c:var(--soil)">
+      <div class="label">Humidité du sol</div>
+      <div class="value"><span id="soilValue">--</span><small>%</small></div>
+      <div class="delta" id="soilDelta">En attente de mesure</div>
+    </div>
+    <div class="panel kpi" style="--c:var(--ph)">
+      <div class="label">pH du sol</div>
+      <div class="value"><span id="phValue">--</span><small>pH</small></div>
+      <div class="delta" id="phDelta">En attente de mesure</div>
+    </div>
+    <div class="panel kpi" style="--c:var(--light)">
+      <div class="label">Luminosité</div>
+      <div class="value"><span id="lightValue">--</span><small>%</small></div>
+      <div class="delta" id="lightDelta">En attente de mesure</div>
     </div>
   </div>
 
@@ -163,6 +213,50 @@
         <div><div class="name">LED 2</div><div class="state" id="ledState2">Éteinte</div></div>
         <button class="switch" id="sw2" aria-label="Basculer la LED 2"></button>
       </div>
+    </div>
+  </div>
+
+  <!-- Irrigation -->
+  <div class="irrig">
+    <div class="panel">
+      <h2>Irrigation</h2>
+      <div class="need-row">
+        <div class="need-badge" id="needBadge" data-need="">En attente</div>
+        <div>
+          <div class="need-reason" id="needReason">En attente du serveur Python</div>
+          <div class="sub" id="needDetail"></div>
+        </div>
+      </div>
+      <div class="probs" id="probs"></div>
+      <div class="valve-head">
+        <div>
+          <div class="name">Vanne</div>
+          <div class="state" id="valveState">État inconnu</div>
+        </div>
+        <div class="seg" id="modeSeg">
+          <button data-mode="auto">Automatique</button>
+          <button data-mode="manual">Manuel</button>
+        </div>
+      </div>
+      <div class="led disabled" id="valveRow">
+        <div><div class="name">Commande manuelle</div><div class="state" id="valveHint">Choisissez d'abord un mode</div></div>
+        <button class="switch" id="swValve" aria-label="Ouvrir ou fermer la vanne"></button>
+      </div>
+      <div class="sub" id="needUpdated"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Parcelle et météo simulée</h2>
+      <div class="form">
+        <label class="field"><span>Stade de croissance</span><select id="stage"></select></label>
+        <div class="field"><span>Paillage</span>
+          <div class="seg" id="mulchSeg"><button data-v="true">Oui</button><button data-v="false">Non</button></div>
+        </div>
+        <label class="field"><span>Pluie cumulée (mm)</span><input type="number" id="rain" min="0" max="2500" step="10" placeholder="0 à 2 500"></label>
+        <label class="field"><span>Vent (km/h)</span><input type="number" id="wind" min="0" max="20" step="0.5" placeholder="0 à 20"></label>
+      </div>
+      <div class="warn" id="missingWarn" hidden></div>
+      <div class="sub">Pluie et vent sont saisis à la main (météo simulée). En dehors de la plage d'entraînement du modèle, les valeurs sont ramenées aux bornes.</div>
     </div>
   </div>
 
@@ -238,6 +332,7 @@
 
   /* ---------- Capteurs en direct ---------- */
   let prev = null;
+  const prevFarm = {};
   function delta(el, now, before, unit) {
     if (before == null) { el.textContent = "Première mesure reçue"; return; }
     const d = now - before;
@@ -250,6 +345,9 @@
     const hasT = typeof d.temperature === "number", hasH = typeof d.humidity === "number";
     if (hasT) { $("tempValue").textContent = d.temperature.toFixed(1); delta($("tempDelta"), d.temperature, prev?.temperature, "°C"); }
     if (hasH) { $("humValue").textContent = d.humidity.toFixed(1); delta($("humDelta"), d.humidity, prev?.humidity, "%"); }
+    if (typeof d.soil_moisture === "number") { $("soilValue").textContent = d.soil_moisture.toFixed(1); delta($("soilDelta"), d.soil_moisture, prevFarm.soil, "%"); prevFarm.soil = d.soil_moisture; }
+    if (typeof d.ph === "number") { $("phValue").textContent = d.ph.toFixed(1); delta($("phDelta"), d.ph, prevFarm.ph, "pH"); prevFarm.ph = d.ph; }
+    if (typeof d.light === "number") { $("lightValue").textContent = d.light.toFixed(1); delta($("lightDelta"), d.light, prevFarm.light, "%"); prevFarm.light = d.light; }
     if (hasT && hasH) {
       prev = { temperature: d.temperature, humidity: d.humidity };
       live.push({ t: Date.now(), temp: d.temperature, hum: d.humidity });
@@ -298,8 +396,114 @@
     watchHistory();
   };
 
-  /* ---------- Rendu ---------- */
   const fmtDate = t => t ? new Date(t).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
+
+  /* ---------- Irrigation : recommandation, vanne, parcelle ---------- */
+  const NEEDS = ["Low", "Medium", "High"];
+  const NEED_LABEL = { Low: "Besoin faible", Medium: "Besoin moyen", High: "Besoin élevé" };
+  const NEED_SHORT = { Low: "Faible", Medium: "Moyen", High: "Élevé" };
+  const ACTION_LABEL = {
+    open: "Ouverture commandée", close: "Fermeture commandée",
+    keep_open: "Vanne maintenue ouverte", keep_closed: "Vanne maintenue fermée",
+    manual: "Mode manuel"
+  };
+  const STAGES = { Sowing: "Semis", Vegetative: "Croissance végétative", Flowering: "Floraison", Harvest: "Récolte" };
+
+  $("stage").innerHTML = '<option value="">— à choisir —</option>' +
+    Object.entries(STAGES).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+
+  // Recommandation publiée par le serveur Python
+  onValue(ref(db, "/ai/irrigation"), s => {
+    const d = s.val(), badge = $("needBadge");
+    if (!d) {
+      badge.dataset.need = ""; badge.textContent = "En attente";
+      $("needReason").textContent = "En attente du serveur Python";
+      $("needDetail").textContent = ""; $("probs").innerHTML = ""; $("needUpdated").textContent = "";
+      return;
+    }
+    const ok = NEEDS.includes(d.need);
+    badge.dataset.need = ok ? d.need : "";
+    badge.textContent = ok ? NEED_LABEL[d.need] : "Pas de décision";
+    $("needReason").textContent = `${ACTION_LABEL[d.action] || d.action} — ${d.reason || ""}`;
+    $("needDetail").textContent = d.error ? `Détail : ${d.error}` : "";
+    $("probs").innerHTML = d.probabilities
+      ? NEEDS.map(k => {
+          const p = Math.round((Number(d.probabilities[k]) || 0) * 100);
+          return `<div class="prob"><span>${NEED_SHORT[k]}</span><div class="bar"><i style="width:${p}%"></i></div><b>${p} %</b></div>`;
+        }).join("") + '<div class="sub">Scores du modèle, non calibrés.</div>'
+      : "";
+    $("needUpdated").textContent = d.updated_at ? `Mis à jour : ${fmtDate(d.updated_at)}` : "";
+  });
+
+  // Vanne : mode, commande, état réel confirmé par l'ESP32
+  let valveMode = null, valveCmd = false;
+  function updateValveControls() {
+    const manual = valveMode === "manual";
+    $("valveRow").classList.toggle("disabled", !manual);
+    $("valveRow").classList.toggle("on", valveCmd);
+    $("valveHint").textContent = valveMode === "auto" ? "Pilotée par le serveur"
+      : manual ? (valveCmd ? "Ouverture demandée" : "Fermeture demandée")
+      : "Choisissez d'abord un mode";
+  }
+  onValue(ref(db, "/valve/mode"), s => {
+    valveMode = s.val();
+    document.querySelectorAll("#modeSeg button").forEach(b => b.classList.toggle("active", b.dataset.mode === valveMode));
+    updateValveControls();
+  });
+  onValue(ref(db, "/valve/command"), s => { valveCmd = s.val() === true; updateValveControls(); });
+  onValue(ref(db, "/valve/state"), s => {
+    const d = s.val(), el = $("valveState");
+    if (!d) { el.textContent = "État inconnu (aucune confirmation de l'ESP32)"; el.className = "state"; return; }
+    el.textContent = `${d.open ? "Ouverte" : "Fermée"} (${d.angle ?? "?"}°)`;
+    el.className = "state" + (d.open ? " open" : "");
+  });
+  $("modeSeg").onclick = e => { const b = e.target.closest("button"); if (b) set(ref(db, "/valve/mode"), b.dataset.mode); };
+  $("swValve").onclick = () => { if (valveMode === "manual") set(ref(db, "/valve/command"), !valveCmd); };
+
+  // Réglages de la parcelle et météo simulée
+  const farm = {};
+  function refreshMissing() {
+    const miss = [];
+    if (!farm.stage) miss.push("stade de croissance");
+    if (typeof farm.mulching !== "boolean") miss.push("paillage");
+    if (typeof farm.rain !== "number") miss.push("pluie");
+    if (typeof farm.wind !== "number") miss.push("vent");
+    const w = $("missingWarn");
+    w.hidden = !miss.length;
+    w.textContent = miss.length ? `Valeurs non définies : ${miss.join(", ")}. En mode automatique, la vanne reste fermée tant qu'elles manquent.` : "";
+  }
+  const setIfIdle = (el, v) => { if (document.activeElement !== el) el.value = v ?? ""; };
+  onValue(ref(db, "/field"), s => {
+    const d = s.val() || {};
+    farm.stage = d.growth_stage; farm.mulching = d.mulching;
+    setIfIdle($("stage"), d.growth_stage);
+    document.querySelectorAll("#mulchSeg button").forEach(b =>
+      b.classList.toggle("active", typeof d.mulching === "boolean" && (b.dataset.v === "true") === d.mulching));
+    refreshMissing();
+  });
+  onValue(ref(db, "/weather"), s => {
+    const d = s.val() || {};
+    farm.rain = d.rainfall; farm.wind = d.wind;
+    setIfIdle($("rain"), d.rainfall); setIfIdle($("wind"), d.wind);
+    refreshMissing();
+  });
+  $("stage").onchange = e => set(ref(db, "/field/growth_stage"), e.target.value || null);
+  $("mulchSeg").onclick = e => { const b = e.target.closest("button"); if (b) set(ref(db, "/field/mulching"), b.dataset.v === "true"); };
+  function bindNumber(id, path, min, max) {
+    $(id).onchange = e => {
+      const raw = e.target.value.trim();
+      if (raw === "") { set(ref(db, path), null); return; }
+      let v = Number(raw);
+      if (!Number.isFinite(v)) return;
+      v = Math.min(Math.max(v, min), max);
+      e.target.value = v;
+      set(ref(db, path), v);
+    };
+  }
+  bindNumber("rain", "/weather/rainfall", 0, 2500);
+  bindNumber("wind", "/weather/wind", 0, 20);
+
+  /* ---------- Rendu ---------- */
   const fmtShort = t => t ? new Date(t).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
 
   function render() {

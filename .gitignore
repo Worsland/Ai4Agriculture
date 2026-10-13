@@ -22,6 +22,10 @@ serviceAccount*.json
 
 # Modèles générés
 *.joblib
+ai/data/
+ai/reports/
+ai/models/
+kaggle.json
 
 # Outils
 .firebase/
