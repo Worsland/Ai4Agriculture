@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Historique agricole : lisible par le tableau de bord, écrit uniquement par
+    // le serveur Python (le SDK Admin contourne les règles).
+    match /irrigation_events/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /daily_summaries/{day} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Tout le reste est fermé.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

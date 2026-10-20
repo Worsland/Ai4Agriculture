@@ -123,6 +123,11 @@
   .field .seg { width: fit-content; }
   .warn { background: rgba(255,107,107,.08); border: 1px solid var(--danger); color: var(--danger); border-radius: 8px; padding: 10px 12px; font-size: .82rem; margin-bottom: 12px; }
 
+  /* Historique agricole (Firestore) */
+  .farm { margin-top: 16px; }
+  .farm h3 { margin: 18px 0 10px; font-size: .9rem; font-weight: 600; color: var(--muted); }
+  .farm .table-head h2 span { font-weight: 400; font-size: .8rem; }
+
   @media (max-width: 900px) {
     .irrig { grid-template-columns: 1fr; }
     .kpis { grid-template-columns: 1fr; }
@@ -283,11 +288,45 @@
       </table>
     </div>
   </div>
+
+  <!-- Historique agricole (Firestore) -->
+  <div class="panel farm">
+    <div class="table-head">
+      <h2>Historique agricole <span>· Firestore</span></h2>
+      <div class="seg" id="farmRange">
+        <button data-n="7" class="active">7 jours</button>
+        <button data-n="14">14 jours</button>
+        <button data-n="30">30 jours</button>
+      </div>
+    </div>
+    <div id="farmMsg" class="warn" hidden></div>
+    <div class="stats">
+      <div class="stat"><span>Jours avec données</span><b id="farmDays">--</b></div>
+      <div class="stat"><span>Arrosages</span><b id="farmCount">--</b></div>
+      <div class="stat"><span>Vanne ouverte (total)</span><b id="farmOpen">--</b></div>
+      <div class="stat"><span>Mesures enregistrées</span><b id="farmSamples">--</b></div>
+    </div>
+    <h3>Résumés journaliers</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Jour</th><th>Température</th><th>Humidité air</th><th>Humidité sol</th><th>Vanne ouverte</th><th>Arrosages</th></tr></thead>
+        <tbody id="farmDailyBody"><tr><td colspan="6" class="empty">Chargement…</td></tr></tbody>
+      </table>
+    </div>
+    <h3>Dernières ouvertures de la vanne</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Début</th><th>Durée</th><th>Mode</th><th>Besoin</th><th>Raison</th></tr></thead>
+        <tbody id="farmEventsBody"><tr><td colspan="5" class="empty">Chargement…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
   import { getDatabase, ref, onValue, set, query, limitToLast } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+  import { getFirestore, collection, query as fsQuery, orderBy, limit as fsLimit, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBOKDMWWuCalx1uIr878NNY3ZIO4HgvAxI",
@@ -302,6 +341,7 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
+  const fs = getFirestore(app);
   const $ = id => document.getElementById(id);
 
   /* ---------- État ---------- */
@@ -612,6 +652,80 @@
   }
   window.addEventListener("resize", render);
   render();
+
+  /* ---------- Historique agricole (Firestore) ---------- */
+  (() => {
+    const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const MODE = { auto: "Automatique", manual: "Manuel" };
+    const msg = $("farmMsg");
+
+    const fmtDur = s => {
+      if (typeof s !== "number") return "—";
+      if (s < 60) return `${Math.round(s)} s`;
+      const min = Math.round(s / 60);
+      return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")}`;
+    };
+    const fmtDay = d => { const [y, m, j] = String(d).split("-"); return j ? `${j}/${m}/${y}` : esc(d); };
+    const avg = (x, unit) => x && typeof x.avg === "number" ? `${x.avg.toFixed(1)} ${unit}` : "—";
+    const range = x => x && typeof x.min === "number" && typeof x.max === "number"
+      ? ` <span class="sub">(${x.min.toFixed(1)} – ${x.max.toFixed(1)})</span>` : "";
+
+    function onError(err) {
+      msg.hidden = false;
+      msg.textContent = err.code === "permission-denied"
+        ? "Accès refusé par les règles Firestore. Publier les règles : firebase deploy --only firestore"
+        : "Historique agricole indisponible : " + (err.message || err);
+    }
+
+    function renderDaily(rows) {
+      const sum = key => rows.reduce((a, r) => a + (typeof r[key] === "number" ? r[key] : 0), 0);
+      $("farmDays").textContent = rows.length;
+      $("farmCount").textContent = sum("irrigation_count");
+      $("farmOpen").textContent = fmtDur(sum("valve_open_s"));
+      $("farmSamples").textContent = sum("samples");
+      $("farmDailyBody").innerHTML = rows.length ? rows.map(r => {
+        const s = r.sensors || {};
+        return `<tr><td>${fmtDay(r.date)}</td>`
+          + `<td class="temp">${avg(s.temperature, "°C")}${range(s.temperature)}</td>`
+          + `<td class="hum">${avg(s.humidity, "%")}</td>`
+          + `<td>${avg(s.soil_moisture, "%")}</td>`
+          + `<td>${fmtDur(r.valve_open_s)}</td>`
+          + `<td>${r.irrigation_count ?? 0}</td></tr>`;
+      }).join("") : '<tr><td colspan="6" class="empty">Aucun résumé pour cette période.</td></tr>';
+    }
+
+    function renderEvents(rows) {
+      $("farmEventsBody").innerHTML = rows.length ? rows.map(e => {
+        const approx = e.approximate ? ' title="Vanne déjà ouverte au démarrage du serveur : heure de début inconnue"' : "";
+        return `<tr><td>${fmtDate(e.opened_at?.toMillis?.())}</td>`
+          + `<td${approx}>${e.approximate ? "≈ " : ""}${fmtDur(e.duration_s)}</td>`
+          + `<td>${esc(MODE[e.mode] ?? e.mode ?? "—")}</td>`
+          + `<td>${esc(NEED_SHORT[e.need] ?? "—")}</td>`
+          + `<td>${esc(e.reason ?? "—")}</td></tr>`;
+      }).join("") : '<tr><td colspan="5" class="empty">Aucune ouverture enregistrée.</td></tr>';
+    }
+
+    let unsubDaily = null;
+    function watchDaily(days) {
+      if (unsubDaily) unsubDaily();
+      unsubDaily = onSnapshot(
+        fsQuery(collection(fs, "daily_summaries"), orderBy("date", "desc"), fsLimit(days)),
+        snap => { msg.hidden = true; renderDaily(snap.docs.map(d => d.data())); },
+        onError);
+    }
+    watchDaily(7);
+    onSnapshot(
+      fsQuery(collection(fs, "irrigation_events"), orderBy("opened_at", "desc"), fsLimit(20)),
+      snap => { msg.hidden = true; renderEvents(snap.docs.map(d => d.data())); },
+      onError);
+
+    $("farmRange").onclick = e => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      document.querySelectorAll("#farmRange button").forEach(x => x.classList.toggle("active", x === b));
+      watchDaily(+b.dataset.n);
+    };
+  })();
 </script>
 </body>
 </html>

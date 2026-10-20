@@ -10,7 +10,14 @@
       "**/node_modules/**",
       "*.md",
       "*.ini",
-      "diagram.json"
+      "diagram.json",
+      "firestore.rules",
+      "firestore.indexes.json",
+      "**/service-account*.json"
     ]
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   }
 }

@@ -2,7 +2,7 @@
 
 Projet IoT de bout en bout : des capteurs simulés (Wokwi) mesurent l'état d'une parcelle, les données transitent par Firebase, un serveur Python entraîne des modèles d'IA, et un tableau de bord web affiche l'état du sol, l'historique et les prédictions. À terme, le système estimera le besoin en irrigation et commandera automatiquement une vanne.
 
-> **État d'avancement :** la chaîne d'acquisition, l'historique, la prédiction de température/humidité, le tableau de bord de base et la commande de vanne (côté ESP32) sont en place. Le jeu de données d'irrigation (Kaggle) est analysé et quatre algorithmes ont été comparés ; le modèle final (Gradient Boosting, 6 variables) est entraîné et la décision de la vanne est intégrée au serveur et au tableau de bord (à valider en simulation). MongoDB, l'API, Docker et les tests restants sont à venir (voir la [feuille de route](#8-feuille-de-route)).
+> **État d'avancement :** la chaîne d'acquisition, l'historique, la prédiction de température/humidité, le tableau de bord de base et la commande de vanne (côté ESP32) sont en place. Le jeu de données d'irrigation (Kaggle) est analysé et quatre algorithmes ont été comparés ; le modèle final (Gradient Boosting, 6 variables) est entraîné et la décision de la vanne est intégrée au serveur et au tableau de bord (à valider en simulation). L'historique agricole est écrit dans Firestore par le serveur et affiché par le tableau de bord, avec des règles Firestore en lecture seule (à valider avec la base réelle)  ; une API en lecture seule (FastAPI) les expose. Docker et l'intégration continue sont à venir (voir la [feuille de route](#8-feuille-de-route)).
 
 ---
 
@@ -32,7 +32,7 @@ Ce projet correspond au sujet 10 : *Agriculture intelligente pour la prédiction
 ┌─────────────────────────────────────────────────────────────────┐
 │ 3. COUCHE BASE DE DONNÉES                                       │
 │    Firebase Realtime Database : mesures et commandes temps réel │
-│    MongoDB (à venir) : historique agricole                      │
+│    Firestore : historique agricole (événements, résumés)        │
 └───────────────┬──────────────────────────────▲──────────────────┘
        lecture  │                              │ écriture
                 ▼                              │
@@ -58,6 +58,7 @@ Firebase sert de point de communication central : l'ESP32, le serveur Python et 
 4. La commande de la vanne est écrite dans `/valve/command` (par le serveur en mode automatique, par le tableau de bord en mode manuel).
 5. L'ESP32 lit cette commande, positionne le servomoteur et confirme l'état réel dans `/valve/state`.
 6. Le tableau de bord écoute Firebase et se met à jour en temps réel.
+7. Le serveur Python consigne l'historique agricole dans Firestore : un événement à chaque fermeture de la vanne et un résumé journalier des mesures, fusionné toutes les 10 minutes.
 
 ---
 
@@ -85,10 +86,13 @@ Firebase sert de point de communication central : l'ESP32, le serveur Python et 
 - Évaluation intégrée : l'erreur du modèle est comparée à une référence naïve (« la valeur ne change pas ») et publiée dans `/ai/status`.
 - Plus de repli silencieux sur des données fictives : en cas d'erreur Firebase, rien n'est écrit. Le mode `--demo` n'écrit jamais dans la base.
 - Décision d'irrigation intégrée à la boucle du serveur ([ai/irrigation_service.py](ai/irrigation_service.py)) : lecture des mesures, de la météo simulée et des réglages de la parcelle, prédiction du besoin, commande de `/valve/command` en mode automatique, publication de `/ai/irrigation`. Une erreur d'irrigation ne bloque pas la prédiction température/humidité, et inversement. Option `--no-irrigation` pour la désactiver.
+- Historique agricole dans Firestore ([ai/history_store.py](ai/history_store.py)) : événements d'ouverture de la vanne (durée, mode, besoin prédit, raison) et résumés journaliers des capteurs (min, max, moyenne, minutes d'ouverture). Une panne de Firestore ne bloque ni la prédiction ni la vanne ; options `--no-history` et `--history-flush`. Couvert par 12 tests ([ai/test_history_store.py](ai/test_history_store.py)).
+- API REST en lecture seule ([ai/api.py](ai/api.py), FastAPI) : mesures, prédiction, recommandation d'irrigation et historique agricole, dans un processus séparé du serveur IA (voir [4.7](#47-api-rest-en-lecture-seule)). Couverte par 49 tests ([ai/test_api.py](ai/test_api.py)).
 
 **Couche interface**
 - Tableau de bord redessiné : mesures actuelles avec variations, graphiques température/humidité avec prédiction en pointillés, statistiques, historique consultable (20, 50 ou 200 dernières mesures), contrôle des LED.
 - Nouveaux panneaux : humidité du sol, pH et luminosité ; recommandation d'irrigation avec scores du modèle ; état réel de la vanne, choix du mode automatique ou manuel et commande manuelle ; réglages de la parcelle (stade de croissance, paillage) et météo simulée (pluie, vent) saisis à la main.
+- Panneau « Historique agricole » lu dans Firestore : résumés journaliers sur 7, 14 ou 30 jours (température, humidités, minutes d'ouverture, arrosages), totaux de la période et 20 dernières ouvertures de la vanne.
 
 ---
 
@@ -113,7 +117,7 @@ Le fichier [src/main.cpp](src/main.cpp) contient la logique de l'ESP32.
 - Le serveur ferme normalement la vanne avant (15 min maximum) : ces garde-fous servent quand le serveur ou le réseau tombe.
 
 ### 4.2 Interface web
-Le fichier [index.html](index.html) est le front-end. Il initialise Firebase, écoute les changements en temps réel et affiche les mesures, les courbes, l'historique, la prédiction IA et les LED. Il affiche aussi l'état du sol (humidité, pH, luminosité), la recommandation d'irrigation du serveur, l'état réel de la vanne, le choix du mode (automatique ou manuel) et les réglages de la parcelle et de la météo simulée.
+Le fichier [index.html](index.html) est le front-end. Il initialise Firebase, écoute les changements en temps réel et affiche les mesures, les courbes, l'historique, la prédiction IA et les LED. Il affiche aussi l'état du sol (humidité, pH, luminosité), la recommandation d'irrigation du serveur, l'état réel de la vanne, le choix du mode (automatique ou manuel) et les réglages de la parcelle et de la météo simulée. Un panneau « Historique agricole » lit en direct les collections Firestore `daily_summaries` et `irrigation_events` (lecture seule). Si les règles Firestore ne sont pas publiées, le panneau affiche un message d'erreur.
 
 ### 4.3 Base de données Firebase
 Realtime Database. Chemins utilisés :
@@ -146,11 +150,30 @@ Exemple de mesure envoyée par l'ESP32 :
 }
 ```
 
+#### Firestore : historique agricole
+
+La Realtime Database garde l'état courant et l'historique minute par minute. Firestore, dans le même projet Firebase, conserve l'historique agricole à plus long terme. Seul le serveur Python y écrit (compte de service, qui contourne les règles).
+
+| Collection / document | Contenu | Écrit quand |
+|---|---|---|
+| `irrigation_events/{id}` | `day`, `opened_at`, `closed_at`, `duration_s`, `mode` (`auto` ou `manual`), `need`, `reason`, `approximate` | à la fermeture de la vanne |
+| `daily_summaries/{AAAA-MM-JJ}` | `date`, `samples`, `sensors` (par capteur : `n`, `sum`, `min`, `max`, `avg`), `valve_open_s`, `irrigation_count`, `updated_at` | toutes les 10 min (fusion avec le document du jour) |
+
+Précisions :
+- Le jour est celui de l'heure locale du serveur.
+- Une mesure n'est comptée que si `/history` a reçu une nouvelle entrée : une simulation arrêtée ne fausse pas les statistiques.
+- Les durées d'ouverture sont exactes à un cycle du serveur près (60 s par défaut). `approximate` vaut `true` quand la vanne était déjà ouverte au démarrage du serveur : l'heure d'ouverture est alors inconnue.
+- En cas de panne de Firestore, les données restent en attente et sont renvoyées au cycle suivant. Elles sont perdues si le serveur s'arrête avant : un arrêt par Ctrl+C déclenche une dernière écriture.
+- Les événements en cours (vanne ouverte) ne sont écrits qu'à la fermeture.
+
+**Règles Firestore** ([firestore.rules](firestore.rules)) : les deux collections sont lisibles par le tableau de bord (sans authentification) et aucune écriture n'est autorisée aux clients ; le serveur écrit avec le compte de service, qui contourne les règles. Tout le reste de la base est fermé. La lecture publique est acceptable pour ce TP, mais elle expose l'historique à toute personne qui connaît l'identifiant du projet : une vraie mise en production demande d'authentifier le tableau de bord (voir la [section 7](#7-sécurité-et-bonnes-pratiques)).
+
 ### 4.4 Serveur Python et IA
 Le dossier [ai](ai) contient :
 
 - [ai/server.py](ai/server.py) : boucle continue (une vérification par minute par défaut). Elle lit `/history`, entraîne le modèle s'il y a une nouvelle mesure et écrit les résultats dans Firebase. Elle appelle ensuite le service d'irrigation (voir [4.6](#46-décision-de-la-vanne)).
 - [ai/irrigation_service.py](ai/irrigation_service.py) : accès REST à Firebase, suivi de la fraîcheur des mesures et cycle de décision d'irrigation.
+- [ai/history_store.py](ai/history_store.py) : historique agricole dans Firestore (suivi des ouvertures de la vanne, résumés journaliers, accès `firebase-admin`), appelé par `server.py` à chaque cycle.
 - [ai/sensor_ai.py](ai/sensor_ai.py) : chargement et nettoyage des données, entraînement (Random Forest), évaluation sur les 20 % de mesures les plus récentes, prédiction. Il peut aussi être lancé seul pour un entraînement ponctuel.
 
 Au moins 20 mesures sont nécessaires avant le premier entraînement. L'évaluation de l'erreur demande 30 mesures.
@@ -304,6 +327,23 @@ Limite de la simulation : dans Wokwi, l'humidité du sol est un potentiomètre r
 
 Si le serveur ou le réseau tombe, la vanne ne reste pas ouverte : l'ESP32 applique ses propres garde-fous (durée maximale de 20 min, perte de liaison de 5 min), voir [4.1](#41-microcontrôleur-et-capteurs).
 
+### 4.7 API REST en lecture seule
+
+[ai/api.py](ai/api.py) expose avec FastAPI ce que l'ESP32 et le serveur IA publient dans Firebase, ainsi que l'historique agricole de Firestore. C'est un processus **séparé** de `server.py` : l'API n'écrit jamais rien et ne commande jamais la vanne, donc une panne de l'API ne touche pas à l'irrigation. Les commandes (mode, vanne manuelle, réglages) restent réservées au tableau de bord.
+
+| Route | Contenu | Source |
+|---|---|---|
+| `GET /health` | état de l'API, de la Realtime Database (`firebase`) et de la configuration Firestore (`firestore`) ; répond 503 si Firebase est injoignable | Firebase |
+| `GET /sensors` | dernière mesure : température, humidité, humidité du sol, pH, luminosité | `/sensors` |
+| `GET /prediction` | prédiction température/humidité, `age_s` (âge en secondes) et qualité du modèle (`status`) | `/ai/prediction`, `/ai/status` |
+| `GET /irrigation` | besoin, scores, action de la vanne, raison, mode, `age_s` | `/ai/irrigation` |
+| `GET /history/daily?days=7` | résumés journaliers, du plus récent au plus ancien (`days` de 1 à 90) | Firestore `daily_summaries` |
+| `GET /history/events?limit=20` | ouvertures de la vanne, de la plus récente à la plus ancienne (`limit` de 1 à 200) | Firestore `irrigation_events` |
+
+Codes d'erreur : 404 si la donnée n'existe pas encore (serveur IA jamais lancé), 422 si un paramètre est hors limites, 502 si Firebase ou Firestore est injoignable, 503 si l'historique n'est pas configuré (`FIRESTORE_CREDENTIALS` absent). Toute autre méthode que `GET` donne 405. La documentation interactive est générée sur `/docs`.
+
+Limite : l'API n'a **aucune authentification** et n'écoute par défaut que sur la machine locale (`127.0.0.1`). Il faut l'authentifier avant de l'exposer sur un réseau.
+
 ---
 
 ## 5. Structure des fichiers
@@ -314,7 +354,9 @@ Si le serveur ou le réseau tombe, la vanne ne reste pas ouverte : l'ESP32 appli
 ├── diagram.json          Schéma du circuit Wokwi
 ├── platformio.ini        Configuration PlatformIO
 ├── index.html            Tableau de bord web
-├── firebase.json         Configuration Firebase Hosting
+├── firebase.json         Configuration Firebase Hosting et Firestore
+├── firestore.rules       Règles Firestore (lecture seule de l'historique)
+├── firestore.indexes.json Index Firestore (aucun index composite nécessaire)
 ├── .gitignore            Exclut .venv, .env, clés, modèles générés, jeux de données et rapports
 ├── .venv/                Environnement virtuel Python (non versionné)
 └── ai/
@@ -328,6 +370,13 @@ Si le serveur ou le réseau tombe, la vanne ne reste pas ouverte : l'ESP32 appli
     ├── test_valve_controller.py Tests PyTest de la décision de la vanne
     ├── irrigation_service.py Service d'irrigation (Firebase REST, fraîcheur, cycle de décision)
     ├── test_irrigation_service.py Tests PyTest du service et de l'accès REST
+    ├── history_store.py  Historique agricole dans Firestore (événements de vanne, résumés)
+    ├── test_history_store.py Tests PyTest de l'historique (Firestore simulé)
+    ├── test_irrigation_model.py Tests PyTest de la prédiction d'irrigation (bornage, validation, cohérence)
+    ├── test_sensor_ai.py Tests PyTest de la prédiction température/humidité (lecture, entraînement, écriture)
+    ├── api.py            API REST en lecture seule (FastAPI)
+    ├── test_api.py       Tests PyTest de l'API (Firebase et Firestore simulés)
+    ├── service-account.json Clé de compte de service Firestore (non versionnée)
     ├── requirements.txt  Dépendances Python
     ├── data/             Jeux de données Kaggle (train.csv), non versionné
     ├── reports/          Rapports et graphiques (exploration, comparaison), non versionné
@@ -342,7 +391,7 @@ Si le serveur ou le réseau tombe, la vanne ne reste pas ouverte : l'ESP32 appli
 
 ### 6.1 Prérequis
 - Python 3.12+ et un environnement virtuel
-- Une Realtime Database Firebase active
+- Une Realtime Database Firebase active, et une base Firestore créée dans le même projet
 - PlatformIO (ou Wokwi) pour l'ESP32
 - Un compte Kaggle pour télécharger le jeu de données d'irrigation
 
@@ -362,7 +411,10 @@ Le fichier `ai/.env` doit contenir :
 ```env
 FIREBASE_DATABASE_URL=https://oct-stage-default-rtdb.firebaseio.com
 FIREBASE_API_KEY=your-firebase-api-key
+FIRESTORE_CREDENTIALS=service-account.json
 ```
+
+`FIRESTORE_CREDENTIALS` désigne la clé de compte de service (chemin relatif au dossier `ai/`). Pour la générer : console Firebase, Paramètres du projet, Comptes de service, « Générer une nouvelle clé privée », puis l'enregistrer sous `ai/service-account.json`. Ce fichier donne un accès complet au projet : il ne doit jamais être versionné (voir [la section 7](#7-sécurité-et-bonnes-pratiques)). Sans cette variable, le serveur démarre quand même, sans historique Firestore.
 
 ### 6.4 Récupérer le jeu de données
 1. Se connecter à Kaggle, ouvrir la page de la compétition `playground-series-s6e4` et accepter ses règles (condition du téléchargement).
@@ -415,7 +467,7 @@ Logique de la vanne :
 ```powershell
 python valve_controller.py              # démonstration de scénarios
 python -m pip install pytest
-python -m pytest -v                     # tous les tests (vanne et service d'irrigation)
+python -m pytest -v                     # tous les tests (vanne, service d'irrigation, historique, modèles, API)
 ```
 
 ### 6.5 Lancer le serveur IA
@@ -431,8 +483,11 @@ Le venv se trouve à la racine du projet. Toujours installer avec `python -m pip
 
 Entraînement ponctuel : `python sensor_ai.py`. Test sans Firebase : `python sensor_ai.py --demo`.
 
+Historique Firestore : le message « Historique Firestore activé » doit apparaître au démarrage. Le résumé journalier n'est écrit que toutes les 10 minutes ; pour tester plus vite, lancer `python server.py --history-flush 60`. Les documents apparaissent ensuite dans la console Firebase (Firestore Database, collections `irrigation_events` et `daily_summaries`). `--no-history` désactive cette partie.
+
 ### 6.6 Lancer la simulation et le tableau de bord
 - Simulation : ouvrir le projet dans Wokwi et la démarrer. Elle doit rester active pour que les mesures arrivent.
+- Règles Firestore, à publier une première fois puis à chaque modification de `firestore.rules` : `firebase deploy --only firestore`. Tant qu'elles ne sont pas publiées, la base garde les règles choisies à sa création (mode test : ouvert pour une durée limitée) et le panneau « Historique agricole » peut afficher une erreur d'accès.
 - Tableau de bord : ouvrir `index.html` dans un navigateur, ou le publier avec `firebase deploy --only hosting`.
 
 ### 6.7 Essai de bout en bout de l'irrigation
@@ -448,6 +503,25 @@ Entraînement ponctuel : `python sensor_ai.py`. Test sans Firebase : `python sen
 
 Rappel : les potentiomètres de Wokwi dépassent la plage d'entraînement du modèle. Les valeurs hors plage sont bornées (`Soil_Moisture` à [8, 64,99], `Temperature_C` à [12, 42]).
 
+### 6.8 Lancer l'API
+
+Dans un second terminal, avec le venv activé et le serveur IA lancé ou non (l'API est indépendante) :
+
+```powershell
+cd ai
+python -m pip install -r requirements.txt
+python -m uvicorn api:create_app --factory --port 8000
+```
+
+`python api.py` est équivalent ; l'adresse et le port se règlent avec les variables `API_HOST` (127.0.0.1 par défaut) et `API_PORT` (8000). Ouvrir ensuite http://127.0.0.1:8000/docs pour essayer les routes, ou par exemple :
+
+```powershell
+curl http://127.0.0.1:8000/health
+curl "http://127.0.0.1:8000/history/daily?days=3"
+```
+
+Sans `FIRESTORE_CREDENTIALS` dans `ai/.env`, les routes `/history/*` répondent 503 ; les autres fonctionnent.
+
 ---
 
 ## 7. Sécurité et bonnes pratiques
@@ -455,7 +529,9 @@ Rappel : les potentiomètres de Wokwi dépassent la plage d'entraînement du mod
 - Les règles actuelles de la base sont ouvertes, ce qui convient à un TP mais pas à une utilisation réelle. Elles doivent être restreintes avant tout déploiement, ce qui impose d'authentifier l'ESP32, le serveur et le tableau de bord.
 - Ne jamais versionner `ai/.env`, une clé de compte de service Firebase ni le jeton d'API Kaggle (`kaggle.json`) : le `.gitignore` doit les exclure.
 - Ne pas versionner `ai/data/` : le fichier est volumineux et sa redistribution dépend de la licence de Kaggle. Chaque utilisateur le télécharge lui-même.
-- `firebase.json` doit n'héberger que la page web : `.venv`, `ai/` et `src/` sont exclus du déploiement.
+- `firebase.json` doit n'héberger que la page web : `.venv`, `ai/` et `src/` sont exclus du déploiement, ainsi que `firestore.rules`, `firestore.indexes.json` et tout fichier `service-account*.json`.
+- L'API (`ai/api.py`) est en lecture seule, mais sans authentification : ne pas la publier hors de la machine locale (`API_HOST=0.0.0.0`, Docker, réseau) avant d'y ajouter une authentification.
+- Les règles Firestore ferment toute écriture aux clients. La lecture de l'historique reste publique tant que le tableau de bord n'est pas authentifié.
 - Utiliser un environnement virtuel pour les dépendances Python.
 
 Entrées à ajouter au `.gitignore` :
@@ -464,6 +540,7 @@ Entrées à ajouter au `.gitignore` :
 ai/data/
 ai/reports/
 ai/models/
+ai/service-account.json
 kaggle.json
 ```
 
@@ -486,7 +563,7 @@ kaggle.json
 | Intégration au serveur : nœuds `/weather`, `/field`, `/ai/irrigation`, commande de la vanne | Fait, à valider en simulation : `irrigation_service.py` intégré à `server.py`, 15 tests |
 | Tableau de bord : état du sol, météo simulée, vanne, recommandations | Fait, à valider en simulation : météo et réglages de parcelle saisis à la main |
 | Météo simulée automatique et simulateur de sol (humidité qui remonte quand la vanne s'ouvre) | À venir (optionnel) |
-| MongoDB pour l'historique agricole | À venir |
-| API du serveur (FastAPI) et tests API | À venir |
-| Tests PyTest et validation du modèle | En cours : 31 tests (vanne, service d'irrigation, accès REST) ; tests du modèle et de l'API à venir |
+| Firestore pour l'historique agricole (événements de vanne, résumés journaliers) | Fait côté serveur, à valider avec la base réelle : `history_store.py` intégré à `server.py`, 12 tests. Panneau « Historique agricole » du tableau de bord et règles `firestore.rules` faits, à valider avec la base réelle |
+| API du serveur (FastAPI) et tests API | Fait : API en lecture seule (`api.py`, 6 routes) et 49 tests ; authentification et routes de commande non faites |
+| Tests PyTest et validation du modèle | Fait : 167 tests (vanne 16, service d'irrigation et accès REST 15, historique Firestore 12, prédiction d'irrigation 35 dont 4 qui exigent `models/irrigation_final.joblib`, prédiction température/humidité 40, API 49) |
 | Docker et intégration continue GitHub | À venir |
