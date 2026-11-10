@@ -2,7 +2,7 @@
 
 Projet IoT de bout en bout : des capteurs simulés (Wokwi) mesurent l'état d'une parcelle, les données transitent par Firebase, un serveur Python entraîne des modèles d'IA, et un tableau de bord web affiche l'état du sol, l'historique et les prédictions. À terme, le système estimera le besoin en irrigation et commandera automatiquement une vanne.
 
-> **État d'avancement :** la chaîne d'acquisition, l'historique, la prédiction de température/humidité, le tableau de bord de base et la commande de vanne (côté ESP32) sont en place. Le jeu de données d'irrigation (Kaggle) est analysé et quatre algorithmes ont été comparés ; le modèle final (Gradient Boosting, 6 variables) est entraîné et la décision de la vanne est intégrée au serveur et au tableau de bord (à valider en simulation). L'historique agricole est écrit dans Firestore par le serveur et affiché par le tableau de bord, avec des règles Firestore en lecture seule (à valider avec la base réelle)  ; une API en lecture seule (FastAPI) les expose. Docker et l'intégration continue sont à venir (voir la [feuille de route](#8-feuille-de-route)).
+> **État d'avancement :** la chaîne d'acquisition, l'historique, la prédiction de température/humidité, le tableau de bord de base et la commande de vanne (côté ESP32) sont en place. Le jeu de données d'irrigation (Kaggle) est analysé et quatre algorithmes ont été comparés ; le modèle final (Gradient Boosting, 6 variables) est entraîné et la décision de la vanne est intégrée au serveur et au tableau de bord (à valider en simulation). L'historique agricole est écrit dans Firestore par le serveur et affiché par le tableau de bord, avec des règles Firestore en lecture seule (à valider avec la base réelle) ; une API en lecture seule (FastAPI) les expose. L'API peut être lancée dans Docker et GitHub Actions exécute les tests Python et valide la construction de l'image.
 
 ---
 
@@ -522,6 +522,30 @@ curl "http://127.0.0.1:8000/history/daily?days=3"
 
 Sans `FIRESTORE_CREDENTIALS` dans `ai/.env`, les routes `/history/*` répondent 503 ; les autres fonctionnent.
 
+### 6.9 Lancer l'API avec Docker
+
+Docker ne lance que l'API en lecture seule ; le serveur IA qui peut commander la vanne n'est pas inclus dans le conteneur.
+
+1. Installer et démarrer Docker Desktop.
+2. Créer `ai/.env` à partir de `ai/.env.example`, puis renseigner `FIREBASE_DATABASE_URL`.
+3. Depuis la racine du dépôt, construire et démarrer l'API :
+
+```powershell
+Copy-Item ai/.env.example ai/.env
+# Compléter ai/.env avec l'URL de votre Realtime Database.
+docker compose up --build -d
+```
+
+L'API est disponible uniquement sur la machine locale à `http://127.0.0.1:8000/docs`. Contrôler son état avec `docker compose ps` et ses journaux avec `docker compose logs -f api`. Arrêter le conteneur avec `docker compose down`.
+
+Par défaut, Firestore n'est pas configuré dans le conteneur ; les routes `/history/*` répondent donc 503. Pour les activer, monter le fichier de compte de service en lecture seule dans le conteneur et définir `FIRESTORE_CREDENTIALS` sur son chemin **dans** le conteneur. Ne jamais copier la clé dans l'image, le dépôt ou le contexte de build.
+
+L'API n'a pas d'authentification : le port publié est donc lié à `127.0.0.1`, et ne doit pas être exposé au réseau en modifiant cette adresse.
+
+### 6.10 Intégration continue
+
+GitHub Actions (`.github/workflows/ci.yml`) s'exécute sur chaque push et pull request. Il installe les dépendances de développement puis lance les tests PyTest sous Python 3.11 et 3.12 ; un job séparé vérifie que l'image Docker de l'API se construit. Aucun secret Firebase n'est requis pour ces contrôles.
+
 ---
 
 ## 7. Sécurité et bonnes pratiques
@@ -566,4 +590,4 @@ kaggle.json
 | Firestore pour l'historique agricole (événements de vanne, résumés journaliers) | Fait côté serveur, à valider avec la base réelle : `history_store.py` intégré à `server.py`, 12 tests. Panneau « Historique agricole » du tableau de bord et règles `firestore.rules` faits, à valider avec la base réelle |
 | API du serveur (FastAPI) et tests API | Fait : API en lecture seule (`api.py`, 6 routes) et 49 tests ; authentification et routes de commande non faites |
 | Tests PyTest et validation du modèle | Fait : 167 tests (vanne 16, service d'irrigation et accès REST 15, historique Firestore 12, prédiction d'irrigation 35 dont 4 qui exigent `models/irrigation_final.joblib`, prédiction température/humidité 40, API 49) |
-| Docker et intégration continue GitHub | À venir |
+| Docker pour l'API en lecture seule et intégration continue GitHub | Fait : image Docker et Compose liés à `127.0.0.1`, tests Python sous 3.11/3.12 et vérification de construction de l'image dans GitHub Actions |

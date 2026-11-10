@@ -128,6 +128,104 @@
   .farm h3 { margin: 18px 0 10px; font-size: .9rem; font-weight: 600; color: var(--muted); }
   .farm .table-head h2 span { font-weight: 400; font-size: .8rem; }
 
+  /* Aperçu de la parcelle */
+  .scene-head { margin-bottom: 12px; }
+  .scene-head h2 { margin: 0 0 4px; }
+  .scene-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr); gap: 18px; align-items: start; }
+  .scene-svg { display: block; width: 100%; height: auto; border-radius: 10px; background: var(--panel-2); transition: filter .6s; }
+  .scene-svg[data-scene="offline"] { filter: saturate(.35) brightness(.85); }
+  .scene-status { margin-bottom: 10px; padding: 9px 12px; border-radius: 8px; font-size: .82rem; border: 1px solid var(--line); background: var(--panel-2); color: var(--muted); }
+  .scene-status[data-kind="warn"] { border-color: var(--temp); color: var(--temp); background: rgba(245,165,74,.08); }
+  .scene-facts { margin: 0; display: grid; gap: 0; }
+  .fact { padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .fact:first-child { padding-top: 0; }
+  .fact:last-child { border-bottom: none; }
+  .fact dt { font-size: .78rem; color: var(--muted); }
+  .fact dd { margin: 2px 0 0; }
+  .fact dd b { font-weight: 600; }
+  .fact .sub { display: block; margin-top: 2px; }
+  .ph-gauge { position: relative; height: 8px; margin: 8px 0 3px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line); }
+  .ph-gauge i { position: absolute; top: -5px; width: 4px; height: 16px; margin-left: -2px; border-radius: 2px; background: var(--ph); box-shadow: 0 0 0 2px var(--panel); transition: left .6s; }
+  .ph-ends { display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); }
+  .scene-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; padding: 0; list-style: none; font-size: .78rem; color: var(--muted); }
+  .scene-legend li { display: flex; align-items: center; gap: 6px; }
+  .scene-legend .sw { width: 12px; height: 12px; border-radius: 3px; border: 2px solid var(--muted); background: var(--off); }
+  .scene-legend .sw.open { background: #1f9d6b; border-color: var(--on); }
+  .scene-legend .sw.pend { background: none; border: 2px dashed var(--temp); }
+  .is-off { display: none; }
+
+  /* Éléments SVG de la scène */
+  .sky-stop { transition: stop-color 1.2s; }
+  #soil1, #soil2, #soil3 { transition: fill 1.2s; }
+  #wetDots { transition: opacity 1.2s; }
+  .cloud { fill: #dfe9f1; transition: opacity 1s; }
+  .stem { fill: none; stroke: #4a9a4f; stroke-width: 5; stroke-linecap: round; }
+  .stem.thin { stroke-width: 3; }
+  .leafU { fill: #4fb36b; stroke: #2c7a48; stroke-width: 1.5; }
+  .vein { fill: none; stroke: rgba(0,0,0,.28); stroke-width: 1.2; stroke-linecap: round; }
+  .root { fill: none; stroke: #fff3d6; stroke-width: 2.5; stroke-linecap: round; }
+  .roots { filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); }
+  .petal { fill: #ffe08a; stroke: #d19a2a; stroke-width: 1.2; }
+  .flower-c { fill: #f5a54a; }
+  .fruit { fill: #ff7a59; stroke: #c24a2e; stroke-width: 1.5; }
+  .ghost .stem, .ghost .leafU, .ghost .root { fill: none; stroke: #8397a6; stroke-width: 2; stroke-dasharray: 4 3; }
+  .pipe-edge { fill: none; stroke: #0d1419; stroke-width: 18; stroke-linejoin: round; }
+  .pipe-outer { fill: none; stroke: #8397a6; stroke-width: 14; stroke-linejoin: round; }
+  .pipe-inner { fill: none; stroke: #1a2530; stroke-width: 8; stroke-linejoin: round; }
+  .pipe-water { fill: none; stroke: var(--hum); stroke-width: 5; stroke-linejoin: round; stroke-dasharray: 12 8; display: none; }
+  .pipe-cap, .emitter { fill: #8397a6; stroke: #0d1419; stroke-width: 1.5; }
+  .valve-body { fill: #5b6b78; stroke: #0d1419; stroke-width: 2.5; transition: fill .6s; }
+  .valve-lever { stroke: #8397a6; stroke-width: 5; stroke-linecap: round; }
+  .valve-knob { fill: #8397a6; }
+  #valveLever { transition: transform .6s; transform-origin: 640px 148px; filter: drop-shadow(0 0 1.5px #0d1419); }
+  .scene-svg[data-valve="open"] .valve-body { fill: #1f9d6b; }
+  .scene-svg[data-valve="open"] .valve-lever { stroke: var(--on); }
+  .scene-svg[data-valve="open"] .valve-knob { fill: var(--on); }
+  .scene-svg[data-valve="open"] #valveLever { transform: rotate(90deg); }
+  .scene-svg[data-valve="unknown"] .valve-body { fill: #26343f; stroke-dasharray: 4 3; }
+  #valveQ { display: none; fill: var(--text); font: 700 20px "Segoe UI", sans-serif; text-anchor: middle; }
+  .scene-svg[data-valve="unknown"] #valveQ { display: block; }
+  #valvePending { fill: none; stroke: var(--temp); stroke-width: 3; stroke-dasharray: 6 5; filter: drop-shadow(0 0 2px #0d1419); }
+  .drip, .splash { display: none; }
+  .drip { stroke: var(--hum); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 3 11; }
+  .splash { fill: none; stroke: var(--hum); stroke-width: 2; }
+  .scene-svg[data-water="on"] .pipe-water, .scene-svg[data-water="on"] .drip, .scene-svg[data-water="on"] .splash { display: inline; }
+  .rain-line { stroke: #f2fbff; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 7 13; opacity: .85; }
+  .wind-line { fill: none; stroke: #f2fbff; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 50 70; opacity: .75; display: none; }
+  .scene-svg[data-wind="1"] .w1, .scene-svg[data-wind="2"] .w1, .scene-svg[data-wind="2"] .w2,
+  .scene-svg[data-wind="3"] .wind-line { display: inline; }
+  .pebble { fill: rgba(0,0,0,.22); }
+  .wet-dot { fill: #6fb6d9; }
+
+  /* Mouvements : uniquement transform/opacité/tirets, tous coupés si l'état n'est pas fiable */
+  @keyframes flow { to { stroke-dashoffset: -20; } }
+  @keyframes flow14 { to { stroke-dashoffset: -14; } }
+  @keyframes flow120 { to { stroke-dashoffset: -120; } }
+  @keyframes sway { from { transform: rotate(calc(var(--a) * -1)); } to { transform: rotate(var(--a)); } }
+  @keyframes drift { from { transform: translateX(-10px); } to { transform: translateX(10px); } }
+  @keyframes pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+  @keyframes ripple { 0% { transform: scale(.4); opacity: .9; } 100% { transform: scale(1.4); opacity: 0; } }
+  .rain-line { animation: flow 1.3s linear infinite; }
+  .pipe-water { animation: flow 1s linear infinite; }
+  .drip { animation: flow14 .9s linear infinite; }
+  .splash { animation: ripple 1.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+  .wind-line { animation: flow120 3s linear infinite; }
+  .scene-svg[data-wind="1"] .wind-line { animation-duration: 4s; }
+  .scene-svg[data-wind="2"] .wind-line { animation-duration: 2.8s; }
+  .scene-svg[data-wind="3"] .wind-line { animation-duration: 1.8s; }
+  .scene-svg[data-wind="1"] .sway { --a: 1deg; animation: sway 4s ease-in-out infinite alternate; }
+  .scene-svg[data-wind="2"] .sway { --a: 2.2deg; animation: sway 3s ease-in-out infinite alternate; }
+  .scene-svg[data-wind="3"] .sway { --a: 3.6deg; animation: sway 2s ease-in-out infinite alternate; }
+  .sway { transform-origin: 300px 250px; }
+  .scene-svg[data-scene="ready"] .drift { animation: drift 30s ease-in-out infinite alternate; }
+  .scene-svg[data-scene="ready"] .drift.d2 { animation-duration: 38s; animation-direction: alternate-reverse; }
+  #valvePending { animation: pulse 1.4s ease-in-out infinite; }
+  .scene-svg[data-scene="pending"] *, .scene-svg[data-scene="offline"] * { animation: none !important; }
+  .scene-svg.is-offscreen * { animation-play-state: paused !important; }
+
+  @media (max-width: 900px) { .scene-grid { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { .scene-svg *, .ph-gauge i { animation: none !important; transition: none !important; } }
+
   @media (max-width: 900px) {
     .irrig { grid-template-columns: 1fr; }
     .kpis { grid-template-columns: 1fr; }
@@ -265,6 +363,176 @@
     </div>
   </div>
 
+  <!-- Aperçu de la parcelle -->
+  <section class="panel scene" id="scene" aria-labelledby="sceneTitle">
+    <div class="scene-head">
+      <h2 id="sceneTitle">Aperçu de la parcelle</h2>
+      <div class="sub">Illustration indicative construite à partir des mesures et états Firebase. Elle ne remplace ni les valeurs chiffrées ni l'état confirmé par l'ESP32, et ne commande rien.</div>
+    </div>
+    <div class="scene-status" id="sceneStatus" role="status" data-kind="info">Données en attente de Firebase…</div>
+    <div class="scene-grid">
+      <div>
+        <svg id="sceneSvg" class="scene-svg" viewBox="0 0 800 500" role="img" aria-labelledby="sceneSvgTitle sceneSvgDesc" data-scene="pending" data-wind="0" data-water="off" data-valve="unknown">
+          <title id="sceneSvgTitle">Aperçu schématique de la parcelle</title>
+          <desc id="sceneSvgDesc">Données en attente.</desc>
+          <defs>
+            <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop id="skyTop" class="sky-stop" offset="0" stop-color="#26323c"/>
+              <stop id="skyBottom" class="sky-stop" offset="1" stop-color="#2f3d49"/>
+            </linearGradient>
+            <clipPath id="groundClip"><rect x="0" y="250" width="800" height="250"/></clipPath>
+            <g id="leafG"><path d="M0 0 C10 -16 32 -18 48 -8 C36 10 14 14 0 0Z"/><path class="vein" d="M4 0 Q26 -4 42 -7"/></g>
+            <path id="petalS" d="M0 0 C-7 -8 -7 -20 0 -24 C7 -20 7 -8 0 0Z"/>
+            <g id="cloudShape"><circle cx="150" cy="80" r="18"/><circle cx="176" cy="66" r="24"/><circle cx="204" cy="78" r="20"/><rect x="132" y="80" width="92" height="18" rx="9"/></g>
+          </defs>
+
+          <!-- Ciel -->
+          <g id="sky">
+            <rect x="0" y="0" width="800" height="250" fill="url(#skyGrad)"/>
+            <g id="sun" class="is-off" fill="#ffd166" stroke="#ffd166" stroke-width="3" stroke-linecap="round">
+              <g><line x1="734.0" y1="70.0" x2="746.0" y2="70.0"/><line x1="724.0" y1="94.0" x2="732.5" y2="102.5"/><line x1="700.0" y1="104.0" x2="700.0" y2="116.0"/><line x1="676.0" y1="94.0" x2="667.5" y2="102.5"/><line x1="666.0" y1="70.0" x2="654.0" y2="70.0"/><line x1="676.0" y1="46.0" x2="667.5" y2="37.5"/><line x1="700.0" y1="36.0" x2="700.0" y2="24.0"/><line x1="724.0" y1="46.0" x2="732.5" y2="37.5"/></g>
+              <circle cx="700" cy="70" r="24" stroke="none"/>
+            </g>
+            <circle id="sunGhost" cx="700" cy="70" r="24" fill="none" stroke="#8397a6" stroke-width="2" stroke-dasharray="4 4"/>
+            <g class="drift d1"><use class="cloud" href="#cloudShape"/></g>
+            <g class="drift d2"><use class="cloud" href="#cloudShape" transform="translate(190 -16)"/></g>
+          </g>
+
+          <!-- Météo -->
+          <g id="sceneRainG"></g>
+          <g id="sceneWindG">
+            <path class="wind-line w1" d="M30 130 C70 115 110 145 150 130 S230 115 270 130"/>
+            <path class="wind-line w2" d="M30 170 C70 155 110 185 150 170 S230 155 270 170"/>
+            <path class="wind-line w3" d="M30 210 C70 195 110 225 150 210 S230 195 270 210"/>
+          </g>
+
+          <!-- Sol -->
+          <g id="ground" clip-path="url(#groundClip)">
+            <rect id="soil1" x="0" y="250" width="800" height="70" fill="#3b4651"/>
+            <rect id="soil2" x="0" y="320" width="800" height="80" fill="#333e48"/>
+            <rect id="soil3" x="0" y="400" width="800" height="100" fill="#2b353e"/>
+            <path d="M0 320 Q100 312 200 320 T400 320 T600 320 T800 320 M0 400 Q100 408 200 400 T400 400 T600 400 T800 400" fill="none" stroke="rgba(0,0,0,.3)" stroke-width="2"/>
+            <g id="pebbles"></g>
+            <g id="wetDots" opacity="0"></g>
+          </g>
+          <rect x="1" y="250" width="798" height="249" rx="0" fill="none" stroke="#8397a6" stroke-width="2"/>
+          <rect x="0" y="247" width="800" height="4" fill="#4d7c43"/>
+
+          <!-- Paillage -->
+          <g id="mulch" class="is-off">
+            <rect x="0" y="243" width="800" height="8" rx="4" fill="#c9a24f"/>
+          </g>
+
+          <!-- Plante : un groupe par stade -->
+          <g id="plant">
+            <g id="stage-Sowing" class="stage is-off">
+              <g class="roots"><path class="root" d="M300 250 V266"/><path class="root" d="M300 259 Q292 265 288 272"/><path class="root" d="M300 259 Q308 265 312 272"/></g>
+              <g class="top sway">
+                <ellipse cx="300" cy="250" rx="15" ry="5" fill="#6d4a2b"/>
+                <path class="stem" d="M300 250 L300 234"/>
+                <use class="leafU" href="#leafG" transform="translate(300 235) rotate(-35) scale(.5)"/>
+                <use class="leafU" href="#leafG" transform="translate(300 235) scale(-1 1) rotate(-35) scale(.5)"/>
+              </g>
+            </g>
+            <g id="stage-Vegetative" class="stage is-off">
+              <g class="roots"><path class="root" d="M300 250 C300 280 296 300 298 322"/><path class="root" d="M300 268 Q280 272 266 288"/><path class="root" d="M300 268 Q320 272 334 288"/><path class="root" d="M299 292 Q282 298 272 312"/><path class="root" d="M299 292 Q318 298 328 312"/></g>
+              <g class="top sway">
+                <path class="stem" d="M300 250 C298 220 302 190 300 140"/>
+        <use class="leafU" href="#leafG" transform="translate(300 228) rotate(-20) scale(1.1)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 228) scale(-1 1) rotate(-20) scale(1.1)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 203) rotate(-22) scale(1.0)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 203) scale(-1 1) rotate(-22) scale(1.0)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 178) rotate(-25) scale(0.9)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 178) scale(-1 1) rotate(-25) scale(0.9)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 153) rotate(-28) scale(0.75)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 153) scale(-1 1) rotate(-28) scale(0.75)"/>
+                <use class="leafU" href="#leafG" transform="translate(300 142) rotate(-90) scale(.6)"/>
+              </g>
+            </g>
+            <g id="stage-Flowering" class="stage is-off">
+              <g class="roots"><path class="root" d="M300 250 C300 290 296 330 298 372"/><path class="root" d="M300 268 Q276 270 258 290"/><path class="root" d="M300 268 Q324 270 342 290"/><path class="root" d="M299 296 Q274 300 254 322"/><path class="root" d="M299 296 Q324 300 346 322"/><path class="root" d="M298 330 Q280 338 268 356"/><path class="root" d="M298 330 Q318 338 330 356"/></g>
+              <g class="top sway">
+                <path class="stem" d="M300 250 C298 220 302 170 300 112"/>
+                <path class="stem thin" d="M300 190 Q330 182 340 162"/>
+                <path class="stem thin" d="M300 172 Q272 164 262 146"/>
+        <use class="leafU" href="#leafG" transform="translate(300 230) rotate(-20) scale(1.0)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 230) scale(-1 1) rotate(-20) scale(1.0)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 205) rotate(-22) scale(0.95)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 205) scale(-1 1) rotate(-22) scale(0.95)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 180) rotate(-25) scale(0.85)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 180) scale(-1 1) rotate(-25) scale(0.85)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 155) rotate(-28) scale(0.7)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 155) scale(-1 1) rotate(-28) scale(0.7)"/>
+                <use class="petal" href="#petalS" transform="translate(300 104) rotate(0) scale(1)"/><use class="petal" href="#petalS" transform="translate(300 104) rotate(72) scale(1)"/><use class="petal" href="#petalS" transform="translate(300 104) rotate(144) scale(1)"/><use class="petal" href="#petalS" transform="translate(300 104) rotate(216) scale(1)"/><use class="petal" href="#petalS" transform="translate(300 104) rotate(288) scale(1)"/><circle class="flower-c" cx="300" cy="104" r="5.0"/>
+                <use class="petal" href="#petalS" transform="translate(340 156) rotate(0) scale(0.7)"/><use class="petal" href="#petalS" transform="translate(340 156) rotate(72) scale(0.7)"/><use class="petal" href="#petalS" transform="translate(340 156) rotate(144) scale(0.7)"/><use class="petal" href="#petalS" transform="translate(340 156) rotate(216) scale(0.7)"/><use class="petal" href="#petalS" transform="translate(340 156) rotate(288) scale(0.7)"/><circle class="flower-c" cx="340" cy="156" r="3.5"/>
+                <use class="petal" href="#petalS" transform="translate(262 140) rotate(0) scale(0.7)"/><use class="petal" href="#petalS" transform="translate(262 140) rotate(72) scale(0.7)"/><use class="petal" href="#petalS" transform="translate(262 140) rotate(144) scale(0.7)"/><use class="petal" href="#petalS" transform="translate(262 140) rotate(216) scale(0.7)"/><use class="petal" href="#petalS" transform="translate(262 140) rotate(288) scale(0.7)"/><circle class="flower-c" cx="262" cy="140" r="3.5"/>
+              </g>
+            </g>
+            <g id="stage-Harvest" class="stage is-off">
+              <g class="roots"><path class="root" d="M300 250 C300 290 296 330 298 372"/><path class="root" d="M300 268 Q276 270 258 290"/><path class="root" d="M300 268 Q324 270 342 290"/><path class="root" d="M299 296 Q274 300 254 322"/><path class="root" d="M299 296 Q324 300 346 322"/><path class="root" d="M298 330 Q280 338 268 356"/><path class="root" d="M298 330 Q318 338 330 356"/></g>
+              <g class="top sway">
+                <path class="stem" d="M300 250 C298 220 302 180 300 122"/>
+                <path class="stem thin" d="M300 195 Q272 190 268 204"/>
+                <path class="stem thin" d="M300 175 Q330 172 336 188"/>
+        <use class="leafU" href="#leafG" transform="translate(300 230) rotate(-15) scale(1.0)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 230) scale(-1 1) rotate(-15) scale(1.0)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 205) rotate(-18) scale(0.95)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 205) scale(-1 1) rotate(-18) scale(0.95)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 180) rotate(-20) scale(0.85)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 180) scale(-1 1) rotate(-20) scale(0.85)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 155) rotate(-22) scale(0.7)"/>
+        <use class="leafU" href="#leafG" transform="translate(300 155) scale(-1 1) rotate(-22) scale(0.7)"/>
+                <circle class="fruit" cx="268" cy="214" r="11"/>
+                <circle class="fruit" cx="336" cy="199" r="11"/>
+                <circle class="fruit" cx="300" cy="132" r="10"/>
+              </g>
+            </g>
+          </g>
+
+          <!-- Irrigation -->
+          <g id="irrigation">
+            <path class="pipe-edge" d="M772 250 V175 H398"/>
+            <path class="pipe-outer" d="M772 250 V175 H398"/>
+            <path class="pipe-inner" d="M772 250 V175 H398"/>
+            <path class="pipe-water" d="M772 250 V175 H402"/>
+            <rect class="pipe-cap" x="392" y="167" width="8" height="16" rx="2"/>
+            <path class="emitter" d="M394 182 h12 l-3 12 h-6z"/>
+            <path class="emitter" d="M494 182 h12 l-3 12 h-6z"/>
+            <line class="drip" x1="400" y1="198" x2="400" y2="244"/>
+            <line class="drip" x1="500" y1="198" x2="500" y2="244" style="animation-delay:-.4s"/>
+            <ellipse class="splash" cx="400" cy="245" rx="12" ry="3"/>
+            <ellipse class="splash" cx="500" cy="245" rx="12" ry="3" style="animation-delay:-.5s"/>
+            <circle id="valvePending" class="is-off" cx="640" cy="175" r="34"/>
+            <g id="valveLever"><line class="valve-lever" x1="640" y1="148" x2="640" y2="118"/><circle class="valve-knob" cx="640" cy="118" r="7"/></g>
+            <rect class="valve-body" x="624" y="161" width="32" height="28" rx="6"/>
+            <rect class="valve-body" x="635" y="148" width="10" height="13" rx="2"/>
+            <text id="valveQ" x="640" y="182">?</text>
+          </g>
+        </svg>
+        <ul class="scene-legend" aria-label="Légende de la vanne">
+          <li><i class="sw open"></i>Ouverte, confirmée : l'arrosage s'anime</li>
+          <li><i class="sw"></i>Fermée</li>
+          <li><i class="sw pend"></i>Commande en attente de confirmation</li>
+          <li><b aria-hidden="true">?</b>État inconnu</li>
+        </ul>
+      </div>
+
+      <dl class="scene-facts" id="sceneFacts">
+        <div class="fact"><dt>Humidité du sol</dt><dd><b id="f_soil_v">En attente</b><span class="sub" id="f_soil_s"></span></dd></div>
+        <div class="fact"><dt>pH du sol</dt><dd><b id="f_ph_v">En attente</b>
+          <div class="ph-gauge" aria-hidden="true"><i id="phMarker" hidden></i></div>
+          <div class="ph-ends" aria-hidden="true"><span id="phLo">acide</span><span id="phHi">basique</span></div></dd></div>
+        <div class="fact"><dt>Luminosité</dt><dd><b id="f_light_v">En attente</b><span class="sub" id="f_light_s"></span></dd></div>
+        <div class="fact"><dt>Stade de croissance</dt><dd><b id="f_stage_v">En attente</b><span class="sub" id="f_stage_s"></span></dd></div>
+        <div class="fact"><dt>Paillage</dt><dd><b id="f_mulch_v">En attente</b></dd></div>
+        <div class="fact"><dt>Pluie</dt><dd><b id="f_rain_v">En attente</b><span class="sub" id="f_rain_s"></span></dd></div>
+        <div class="fact"><dt>Vent</dt><dd><b id="f_wind_v">En attente</b><span class="sub" id="f_wind_s"></span></dd></div>
+        <div class="fact"><dt>Vanne</dt><dd aria-live="polite"><b id="f_valve_v">État inconnu</b><span class="sub" id="f_valve_s"></span></dd></div>
+        <div class="fact"><dt>Mode et recommandation</dt><dd><b id="f_mode_v">En attente</b><span class="sub" id="f_mode_s"></span></dd></div>
+      </dl>
+    </div>
+  </section>
+
   <!-- Historique -->
   <div class="panel">
     <div class="table-head">
@@ -350,9 +618,22 @@
   let prediction = null; // {temperature, humidity}
   let limit = 50;
 
+  /* ---------- État de l'aperçu de la parcelle ---------- */
+  // undefined = pas encore de réponse Firebase ; null = réponse reçue sans donnée.
+  const viz = { connected: null, sensors: undefined, field: undefined, weather: undefined,
+                valveState: undefined, valveCmd: undefined, valveMode: undefined, need: undefined };
+  let vizQueued = false;
+  function setViz(key, value) {
+    viz[key] = value;
+    if (vizQueued) return;
+    vizQueued = true;
+    requestAnimationFrame(() => { vizQueued = false; updateScene(viz); });
+  }
+
   /* ---------- Connexion ---------- */
   onValue(ref(db, ".info/connected"), s => {
     $("connDot").className = "dot " + (s.val() ? "live" : "err");
+    setViz("connected", !!s.val());
     $("connText").textContent = s.val() ? "Connecté à Firebase" : "Hors ligne";
   });
 
@@ -381,6 +662,7 @@
   }
   onValue(ref(db, "/sensors"), s => {
     const d = s.val();
+    setViz("sensors", d);
     if (!d) return;
     const hasT = typeof d.temperature === "number", hasH = typeof d.humidity === "number";
     if (hasT) { $("tempValue").textContent = d.temperature.toFixed(1); delta($("tempDelta"), d.temperature, prev?.temperature, "°C"); }
@@ -455,6 +737,7 @@
   // Recommandation publiée par le serveur Python
   onValue(ref(db, "/ai/irrigation"), s => {
     const d = s.val(), badge = $("needBadge");
+    setViz("need", d);
     if (!d) {
       badge.dataset.need = ""; badge.textContent = "En attente";
       $("needReason").textContent = "En attente du serveur Python";
@@ -487,12 +770,14 @@
   }
   onValue(ref(db, "/valve/mode"), s => {
     valveMode = s.val();
+    setViz("valveMode", valveMode);
     document.querySelectorAll("#modeSeg button").forEach(b => b.classList.toggle("active", b.dataset.mode === valveMode));
     updateValveControls();
   });
-  onValue(ref(db, "/valve/command"), s => { valveCmd = s.val() === true; updateValveControls(); });
+  onValue(ref(db, "/valve/command"), s => { valveCmd = s.val() === true; setViz("valveCmd", s.val()); updateValveControls(); });
   onValue(ref(db, "/valve/state"), s => {
     const d = s.val(), el = $("valveState");
+    setViz("valveState", d);
     if (!d) { el.textContent = "État inconnu (aucune confirmation de l'ESP32)"; el.className = "state"; return; }
     el.textContent = `${d.open ? "Ouverte" : "Fermée"} (${d.angle ?? "?"}°)`;
     el.className = "state" + (d.open ? " open" : "");
@@ -516,6 +801,7 @@
   onValue(ref(db, "/field"), s => {
     const d = s.val() || {};
     farm.stage = d.growth_stage; farm.mulching = d.mulching;
+    setViz("field", d);
     setIfIdle($("stage"), d.growth_stage);
     document.querySelectorAll("#mulchSeg button").forEach(b =>
       b.classList.toggle("active", typeof d.mulching === "boolean" && (b.dataset.v === "true") === d.mulching));
@@ -524,6 +810,7 @@
   onValue(ref(db, "/weather"), s => {
     const d = s.val() || {};
     farm.rain = d.rainfall; farm.wind = d.wind;
+    setViz("weather", d);
     setIfIdle($("rain"), d.rainfall); setIfIdle($("wind"), d.wind);
     refreshMissing();
   });
@@ -542,6 +829,221 @@
   }
   bindNumber("rain", "/weather/rainfall", 0, 2500);
   bindNumber("wind", "/weather/wind", 0, 20);
+
+  /* ---------- Aperçu de la parcelle (lecture seule : n'écrit jamais dans Firebase) ---------- */
+  // Seuils et paliers purement visuels, à ajuster après essai avec les mesures réelles.
+  // Ce ne sont pas des seuils agronomiques validés.
+  const VIZ = {
+    ranges: { soil: [0, 100], ph: [0, 14], light: [0, 100], rain: [0, 2500], wind: [0, 20] },
+    soil:  { dry: 30, wet: 60 },        // % : < dry = sec, >= wet = humide
+    light: { low: 25, high: 65 },       // % : < low = faible, >= high = forte
+    phScale: [3, 10],                   // bornes d'affichage de l'échelle (pas des bornes de mesure)
+    rain: [                             // mm cumulés saisis ; drops = lignes de pluie visibles (sur 24)
+      { max: 0,        drops: 0,  label: "aucune pluie saisie" },
+      { max: 50,       drops: 6,  label: "pluie faible" },
+      { max: 500,      drops: 14, label: "pluie modérée" },
+      { max: Infinity, drops: 24, label: "pluie forte" }
+    ],
+    wind: [                             // km/h saisis ; level = palier d'animation (0 = aucune)
+      { max: 0,        level: 0, label: "calme" },
+      { max: 5,        level: 1, label: "vent léger" },
+      { max: 12,       level: 2, label: "vent modéré" },
+      { max: Infinity, level: 3, label: "vent fort" }
+    ]
+  };
+  const SOIL_DRY     = ["#b38b5c", "#9c7650", "#86623f"];
+  const SOIL_WET     = ["#5a3a24", "#46301f", "#352215"];
+  const SOIL_NEUTRAL = ["#3b4651", "#333e48", "#2b353e"];
+  const SKY_NEUTRAL  = ["#26323c", "#2f3d49"];
+  const SKY_NIGHT    = ["#16263a", "#243447"];
+  const SKY_DAY      = ["#3a86c4", "#5fabdc"];
+  const NS = "http://www.w3.org/2000/svg";
+
+  const lerpHex = (a, b, t) => {
+    const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const A = p(a), B = p(b);
+    return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, "0")).join("");
+  };
+  const clamp01 = x => Math.min(Math.max(x, 0), 1);
+  const nf = (v, d = 1) => v.toLocaleString("fr-FR", { maximumFractionDigits: d });
+  const svgEl = (name, attrs) => {
+    const e = document.createElementNS(NS, name);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  };
+
+  // Décor généré une seule fois (positions déterministes, jamais reconstruites ensuite)
+  const sceneRain = [];
+  (function buildSceneDecor() {
+    let seed = 7;
+    const rnd = () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const pebbles = $("pebbles"), dots = $("wetDots"), mulch = $("mulch"), rain = $("sceneRainG");
+    for (let i = 0; i < 46; i++) {
+      pebbles.appendChild(svgEl("ellipse", { class: "pebble", cx: (rnd() * 790 + 5).toFixed(0), cy: (rnd() * 235 + 258).toFixed(0), rx: (2 + rnd() * 4).toFixed(1), ry: (1.5 + rnd() * 2.5).toFixed(1) }));
+    }
+    for (let i = 0; i < 60; i++) {
+      dots.appendChild(svgEl("circle", { class: "wet-dot", cx: (rnd() * 790 + 5).toFixed(0), cy: (rnd() * 235 + 258).toFixed(0), r: (1.2 + rnd() * 1.6).toFixed(1) }));
+    }
+    for (let x = 6; x < 800; x += 9) {
+      if (x > 282 && x < 318) continue;            // laisse la base de la plante dégagée
+      const y = 240 + rnd() * 8, dx = 10 + rnd() * 8, dy = -6 + rnd() * 12;
+      mulch.appendChild(svgEl("line", { x1: x, y1: y.toFixed(1), x2: (x + dx).toFixed(1), y2: (y + dy).toFixed(1), stroke: rnd() > .5 ? "#e3c46c" : "#a8832f", "stroke-width": 3, "stroke-linecap": "round" }));
+    }
+    // 24 lignes de pluie, réparties sous deux nuages (une sur deux par nuage)
+    for (let i = 0; i < 24; i++) {
+      const k = i >> 1, cloudB = i % 2, frac = ((k + 1) * 0.618) % 1;
+      const x = (cloudB ? 330 : 140) + frac * 80, y1 = cloudB ? 86 : 104;
+      const l = svgEl("line", { class: "rain-line is-off", x1: x.toFixed(1), y1, x2: x.toFixed(1), y2: 244 });
+      l.style.animationDuration = (1.1 + rnd() * .6).toFixed(2) + "s";
+      l.style.animationDelay = (-rnd() * 1.5).toFixed(2) + "s";
+      rain.appendChild(l); sceneRain.push(l);
+    }
+  })();
+
+  // Lecture sûre d'une mesure : {st: pending | missing | invalid | ok, v}
+  function readNum(src, key, range) {
+    if (src === undefined) return { st: "pending" };
+    const v = src ? src[key] : undefined;
+    if (v === undefined || v === null) return { st: "missing" };
+    if (typeof v !== "number" || !Number.isFinite(v) || v < range[0] || v > range[1]) return { st: "invalid" };
+    return { st: "ok", v };
+  }
+  const NA = { pending: "En attente", missing: "Pas de mesure", invalid: "Valeur invalide ou hors plage" };
+  const NA_MANUAL = { pending: "En attente", missing: "Non renseignée", invalid: "Valeur invalide ou hors plage" };
+
+  const factOrder = [];
+  function fact(key, value, sub) {
+    $("f_" + key + "_v").textContent = value;
+    const s = $("f_" + key + "_s");
+    if (s) s.textContent = sub || "";
+    factOrder.push([key, value, sub]);
+  }
+  const FACT_LABEL = { soil: "Humidité du sol", ph: "pH", light: "Luminosité", stage: "Stade", mulch: "Paillage", rain: "Pluie", wind: "Vent", valve: "Vanne", mode: "Mode" };
+
+  let lastRainN = -1;
+  function updateScene(d = viz) {
+    factOrder.length = 0;
+    const svg = $("sceneSvg");
+    const offline = d.connected === false;
+    const loaded = ["sensors", "field", "weather", "valveState", "valveCmd", "valveMode", "need"].some(k => d[k] !== undefined);
+    svg.dataset.scene = offline ? "offline" : loaded ? "ready" : "pending";
+
+    const soil = readNum(d.sensors, "soil_moisture", VIZ.ranges.soil);
+    const ph = readNum(d.sensors, "ph", VIZ.ranges.ph);
+    const light = readNum(d.sensors, "light", VIZ.ranges.light);
+    const rain = readNum(d.weather, "rainfall", VIZ.ranges.rain);
+    const wind = readNum(d.weather, "wind", VIZ.ranges.wind);
+    const invalid = [soil, ph, light, rain, wind].some(r => r.st === "invalid");
+
+    // Ciel et soleil : seulement selon la luminosité mesurée
+    const sky = light.st === "ok"
+      ? [lerpHex(SKY_NIGHT[0], SKY_DAY[0], light.v / 100), lerpHex(SKY_NIGHT[1], SKY_DAY[1], light.v / 100)]
+      : SKY_NEUTRAL;
+    $("skyTop").style.stopColor = sky[0]; $("skyBottom").style.stopColor = sky[1];
+    $("sun").classList.toggle("is-off", light.st !== "ok");
+    $("sunGhost").classList.toggle("is-off", light.st === "ok");
+    if (light.st === "ok") $("sun").style.opacity = (0.25 + 0.75 * light.v / 100).toFixed(2);
+    document.querySelectorAll(".cloud").forEach(c => { c.style.opacity = light.st === "ok" ? (0.55 + 0.45 * light.v / 100).toFixed(2) : "0.35"; });
+    fact("light", light.st === "ok" ? `${light.v < VIZ.light.low ? "Faible" : light.v < VIZ.light.high ? "Moyenne" : "Forte"} · ${nf(light.v)} %` : NA[light.st],
+      light.st === "ok" ? `Seuils visuels : faible < ${VIZ.light.low} %, forte ≥ ${VIZ.light.high} %` : "");
+
+    // Sol : dégradé continu, libellé par paliers
+    const t = soil.st === "ok" ? clamp01(soil.v / 100) : null;
+    ["soil1", "soil2", "soil3"].forEach((id, i) => {
+      $(id).style.fill = t === null ? SOIL_NEUTRAL[i] : lerpHex(SOIL_DRY[i], SOIL_WET[i], t);
+    });
+    $("wetDots").style.opacity = t === null ? 0 : (t * 0.9).toFixed(2);
+    fact("soil", soil.st === "ok" ? `${soil.v < VIZ.soil.dry ? "Sec" : soil.v < VIZ.soil.wet ? "Intermédiaire" : "Humide"} · ${nf(soil.v)} %` : NA[soil.st],
+      soil.st === "ok" ? `Seuils visuels : sec < ${VIZ.soil.dry} %, humide ≥ ${VIZ.soil.wet} %` : "");
+
+    // pH : échelle dédiée, sans lien avec la couleur de la terre
+    const marker = $("phMarker");
+    marker.hidden = ph.st !== "ok";
+    if (ph.st === "ok") marker.style.left = (clamp01((ph.v - VIZ.phScale[0]) / (VIZ.phScale[1] - VIZ.phScale[0])) * 100).toFixed(1) + "%";
+    $("phLo").textContent = `acide (${VIZ.phScale[0]})`; $("phHi").textContent = `basique (${VIZ.phScale[1]})`;
+    fact("ph", ph.st === "ok" ? `pH ${nf(ph.v)}` : NA[ph.st]);
+
+    // Paillage
+    const mulching = d.field ? d.field.mulching : undefined;
+    $("mulch").classList.toggle("is-off", mulching !== true);
+    fact("mulch", d.field === undefined ? "En attente" : mulching === true ? "Oui" : mulching === false ? "Non" : "Non défini");
+
+    // Plante : un seul stade visible ; stade absent = silhouette pointillée « non défini »
+    const stageKey = d.field ? d.field.growth_stage : undefined;
+    const known = typeof stageKey === "string" && Object.prototype.hasOwnProperty.call(STAGES, stageKey);
+    Object.keys(STAGES).forEach(k => {
+      const g = $("stage-" + k);
+      g.classList.toggle("is-off", known ? k !== stageKey : k !== "Sowing");
+      g.classList.toggle("ghost", !known);
+    });
+    fact("stage", known ? STAGES[stageKey] : d.field === undefined ? "En attente" : "Non défini",
+      known ? "Silhouette schématique, culture non précisée" : "");
+
+    // Pluie (saisie à la main : jamais présentée comme une mesure de station)
+    let drops = 0;
+    if (rain.st === "ok") {
+      const step = VIZ.rain.find(s => rain.v <= s.max);
+      drops = step.drops;
+      fact("rain", `${nf(rain.v, 0)} mm · ${step.label}`, "Saisie manuelle (météo simulée), pas une station météo");
+    } else {
+      fact("rain", NA_MANUAL[rain.st], rain.st === "missing" ? "Aucune pluie dessinée : l'absence de saisie n'est pas du temps sec" : "");
+    }
+    if (drops !== lastRainN) { sceneRain.forEach((l, i) => l.classList.toggle("is-off", i >= drops)); lastRainN = drops; }
+
+    // Vent (idem : saisi à la main)
+    let level = 0;
+    if (wind.st === "ok") {
+      const step = VIZ.wind.find(s => wind.v <= s.max);
+      level = step.level;
+      fact("wind", `${nf(wind.v)} km/h · ${step.label}`, "Saisie manuelle (météo simulée)");
+    } else {
+      fact("wind", NA_MANUAL[wind.st]);
+    }
+    svg.dataset.wind = String(level);
+
+    // Vanne : l'illustration suit /valve/state ; /valve/command seul = « en attente »
+    const st = d.valveState;
+    const confirmed = st && typeof st.open === "boolean" ? st.open : null;
+    const cmd = typeof d.valveCmd === "boolean" ? d.valveCmd : null;
+    const pending = !offline && cmd !== null && cmd !== confirmed;
+    const visual = offline || confirmed === null ? "unknown" : confirmed ? "open" : "closed";
+    svg.dataset.valve = visual;
+    svg.dataset.water = !offline && confirmed === true ? "on" : "off";
+    $("valvePending").classList.toggle("is-off", !pending);
+    let vText, vSub;
+    if (offline) { vText = "État non vérifiable"; vSub = "Hors ligne : aucune confirmation de l'ESP32"; }
+    else if (confirmed === null) { vText = "État inconnu"; vSub = "Aucune confirmation de l'ESP32"; }
+    else {
+      const angle = typeof st.angle === "number" && Number.isFinite(st.angle) ? ` (${nf(st.angle, 0)}°)` : "";
+      vText = (confirmed ? "Ouverte" : "Fermée") + angle;
+      vSub = confirmed ? "Confirmée par l'ESP32 : arrosage animé" : "Confirmée par l'ESP32";
+    }
+    if (pending) vSub = `${cmd ? "Ouverture" : "Fermeture"} demandée, en attente de confirmation de l'ESP32`;
+    fact("valve", vText, vSub);
+
+    // Mode et recommandation (la recommandation n'est pas une commande)
+    const modeTxt = d.valveMode === "auto" ? "automatique" : d.valveMode === "manual" ? "manuel" : null;
+    const needOk = d.need && NEEDS.includes(d.need.need);
+    fact("mode", modeTxt ? `Mode ${modeTxt}` : (d.valveMode === undefined ? "En attente" : "Mode non défini"),
+      `Recommandation : ${needOk ? NEED_LABEL[d.need.need].toLowerCase() : "aucune"}. Ce n'est pas une commande.`);
+
+    // Bandeau d'état
+    const bar = $("sceneStatus");
+    let msg = "", kind = "info";
+    if (offline) { msg = loaded ? "Hors ligne : les valeurs affichées peuvent être anciennes, l'arrosage n'est plus animé." : "Hors ligne : aucune donnée reçue."; kind = "warn"; }
+    else if (!loaded) msg = "Données en attente de Firebase…";
+    else if (d.sensors === null) msg = "Aucune mesure de capteur reçue : sol, pH et luminosité ne sont pas représentés.";
+    else if (invalid) { msg = "Certaines valeurs sont invalides ou hors plage : elles ne sont pas représentées."; kind = "warn"; }
+    bar.hidden = !msg; bar.textContent = msg; bar.dataset.kind = kind;
+
+    // Description accessible mise à jour avec les mêmes textes que le panneau
+    $("sceneSvgDesc").textContent = (msg ? msg + " " : "") +
+      factOrder.slice().sort((x, y) => Object.keys(FACT_LABEL).indexOf(x[0]) - Object.keys(FACT_LABEL).indexOf(y[0])).map(([k, v, s]) => `${FACT_LABEL[k]} : ${v}${s && k === "valve" ? " — " + s : ""}.`).join(" ");
+  }
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(([e]) => $("sceneSvg").classList.toggle("is-offscreen", !e.isIntersecting)).observe($("sceneSvg"));
+  }
+  updateScene(viz);
 
   /* ---------- Rendu ---------- */
   const fmtShort = t => t ? new Date(t).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
